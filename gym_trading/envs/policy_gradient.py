@@ -42,7 +42,7 @@ class PolicyGradient(object) :
         self._tf_model = {}
         self._num_actions = num_actions
         hidden_neurons = obs_dim * neurons_per_dim
-        with tf.variable_scope('layer_one',reuse=False):
+        with tf.variable_scope('layer_one',reuse=tf.AUTO_REUSE):
             L1 = tf.truncated_normal_initializer(mean=0,
                                                  stddev=1./np.sqrt(obs_dim),
                                                  dtype=tf.float32)
@@ -101,7 +101,7 @@ class PolicyGradient(object) :
         self._sess.run(init_op)
         if load_model:
             ckpt = tf.train.get_checkpoint_state(model_dir)
-            print tf.train.latest_checkpoint(model_dir)
+            print(tf.train.latest_checkpoint(model_dir))
             if ckpt and ckpt.model_checkpoint_path:
                 savr = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta')
                 out = savr.restore(self._sess, ckpt.model_checkpoint_path)
@@ -148,7 +148,7 @@ class PolicyGradient(object) :
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
                 xs,rs,ys = [],[],[] # reset game history
-                df = env.env.sim.to_df()
+                df = env.sim.to_df()
                 #pdb.set_trace()
                 simrors[episode]=df.bod_nav.values[-1]-1 # compound returns
                 mktrors[episode]=df.mkt_nav.values[-1]-1

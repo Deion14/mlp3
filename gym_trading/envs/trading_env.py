@@ -190,7 +190,7 @@ class TradingEnv(gym.Env):
     self.action_space = spaces.Discrete( 3 )
     self.observation_space= spaces.Box( self.src.min_values,
                                         self.src.max_values)
-    self.reset()
+    #self.reset()
 
   def _configure(self, display=None):
     self.display = display
@@ -250,7 +250,7 @@ class TradingEnv(gym.Env):
     for i in range(episodes):
       df = self.run_strat(strategy, return_df=need_df)
       if write_log:
-        df.to_csv(logfile, mode='a')
+        #df.to_csv(logfile, mode='a')
         if return_df:
           alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
             
