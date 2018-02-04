@@ -34,7 +34,8 @@ class QuandlEnvSrc(object):
   Pulls data from Quandl, preps for use by TradingEnv and then 
   acts as data provider for each new episode.
   '''
-
+  q_api_key = "bB4wp5--7XrkpGZ7-gxJ"
+  quandl.ApiConfig.api_key = q_api_key
   MinPercentileDays = 100 
   QuandlAuthToken = ""  # not necessary, but can be used if desired
   Name = "TSE/9994" # https://www.quandl.com/search (use 'Free' filter)
@@ -44,29 +45,54 @@ class QuandlEnvSrc(object):
     self.auth = auth
     self.days = days+1
     log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
-    df = quandl.get(self.name) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
+    df = quandl.get_table('WIKI/PRICES', ticker=['A','AAPL'], qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2015-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
     log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
     
-    df = df[ ~np.isnan(df.Volume)][['Close','Volume']]
+ 
+    
+    df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
+    print(df.shape)
     # we calculate returns and percentiles, then kill nans
-    df = df[['Close','Volume']]   
-    df.Volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
-    df['Return'] = (df.Close-df.Close.shift())/df.Close.shift()
+    df = df[['ticker','adj_close','volume']] 
+    df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
+    df['Return'] = (df.adj_close-df.adj_close.shift())/df.adj_close.shift()
     pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    df['ClosePctl'] = df.Close.expanding(self.MinPercentileDays).apply(pctrank)
-    df['VolumePctl'] = df.Volume.expanding(self.MinPercentileDays).apply(pctrank)
-    df.dropna(axis=0,inplace=True)
-    R = df.Return
-    if scale:
-      mean_values = df.mean(axis=0)
-      std_values = df.std(axis=0)
-      df = (df - np.array(mean_values))/ np.array(std_values)
-    df['Return'] = R # we don't want our returns scaled
+    #df['ClosePctl'] = df.adj_close.expanding(self.MinPercentileDays).apply(pctrank)
+    #df['VolumePctl'] = df.volume.expanding(self.MinPercentileDays).apply(pctrank)
+    
+    #I separated the dataframes by ticker, had a for loop that does the return calculation, then stacked the stocks vertically and got rid of the NaN values in a really absic way. It works, but we will want to do something more sophistocated later
+    A = df[df['ticker'] == 'A']
+    A = A[['adj_close','volume','Return']]
+
+    AAPL = df[df['ticker'] == 'AAPL']
+    AAPL = AAPL[['adj_close','volume','Return']]
+    
+    stocks = [A, AAPL]
+    for df in stocks:
+        #df.dropna(axis=0,inplace=True)
+        R = df.Return
+        if scale:
+          mean_values = df.mean(axis=0)
+          std_values = df.std(axis=0)
+          df = (df - np.array(mean_values))/ np.array(std_values)
+        df['Return'] = R # we don't want our returns scaled
+        df.fillna(0)
+
+
+    df = np.dstack((stocks[0], stocks[1])) 
+    df[0,2,0] = 0
+    df[0,2,1] = 0
+
+
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
     self.data = df
     self.step = 0
-    
+
+
+
+
+
   def reset(self):
     # we want contiguous data
     self.idx = np.random.randint( low = 0, high=len(self.data.index)-self.days )
