@@ -45,13 +45,13 @@ class QuandlEnvSrc(object):
     self.auth = auth
     self.days = days+1
     log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
-    df = quandl.get_table('WIKI/PRICES', ticker=['A','AAPL'], qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2015-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
+    df = quandl.get_table('WIKI/PRICES', ticker=['A','AAPL'], qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
     log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
     
  
     
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
-    print(df.shape)
+    #print(df.shape)
     # we calculate returns and percentiles, then kill nans
     df = df[['ticker','adj_close','volume']] 
     df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
@@ -66,7 +66,7 @@ class QuandlEnvSrc(object):
 
     AAPL = df[df['ticker'] == 'AAPL']
     AAPL = AAPL[['adj_close','volume','Return']]
-    
+    #pdb.set_trace()
     stocks = [A, AAPL]
     for df in stocks:
         #df.dropna(axis=0,inplace=True)
@@ -77,24 +77,28 @@ class QuandlEnvSrc(object):
           df = (df - np.array(mean_values))/ np.array(std_values)
         df['Return'] = R # we don't want our returns scaled
         df.fillna(0)
-
-
+        
+        
+    AAPL=AAPL.set_index(np.arange(0,len(A)))
+    A=A.join(AAPL, lsuffix='A', rsuffix='AAPL')
     df = np.dstack((stocks[0], stocks[1])) 
     df[0,2,0] = 0
     df[0,2,1] = 0
 
-
+    df=A
+    
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
     self.data = df
     self.step = 0
 
 
-
+   
 
 
   def reset(self):
     # we want contiguous data
+    
     self.idx = np.random.randint( low = 0, high=len(self.data.index)-self.days )
     self.step = 0
 

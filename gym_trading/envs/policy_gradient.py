@@ -89,7 +89,9 @@ class PolicyGradient(object) :
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
         logp = tf.matmul(h, self._tf_model['W2'])
-        p = tf.nn.softmax(logp)
+        tf.Print(logp,logp)
+        p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
+        #p = tf.nn.softmax(logp)
         return p
 
     def train_model(self, env, episodes=100, 
@@ -124,6 +126,7 @@ class PolicyGradient(object) :
         victory = False
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
+            pdb.set_trace()
             x = observation
             feed = {self._tf_x: np.reshape(x, (1,-1))}
             aprob = self._sess.run(self._tf_aprob,feed)
