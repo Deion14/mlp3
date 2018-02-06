@@ -84,9 +84,9 @@ class QuandlEnvSrc(object):
     df = np.dstack((stocks[0], stocks[1])) 
     df[0,2,0] = 0
     df[0,2,1] = 0
-
+   
     df=A
-    
+
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
     self.data = df
@@ -126,7 +126,9 @@ class TradingSim(object) :
     self.posns            = np.zeros(self.steps)
     self.costs            = np.zeros(self.steps)
     self.trades           = np.zeros(self.steps)
-    self.mkt_retrns       = np.zeros((self.steps,2))
+    self.mkt_retrns       = np.zeros((self.steps,1))
+    self.total_returns    = 0
+    self.negative_returns = np.zeros(0)
     
   def reset(self):
     self.step = 0
@@ -147,18 +149,42 @@ class TradingSim(object) :
     #bod_nav  = 1.0 if self.step == 0 else self.navs[self.step-1]
     #mkt_nav  = 1.0 if self.step == 0 else self.mkt_nav[self.step-1]
 
-    self.mkt_retrns[self.step,:] = retrn
-    self.actions[self.step,:] = action
     
+    self.actions[self.step,:] = action
     #self.posns[self.step] = action - 1     
     #self.trades[self.step] = self.posns[self.step] - bod_posn
-    
+
     trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
     self.costs[self.step] = trade_costs_pct +  self.time_cost_bps
     reward= np.dot(retrn, action)-self.costs[self.step]
+    
+    nominal_reward = np.dot(retrn, action) - self.costs[self.step]
+    self.total_returns = self.total_returns + nominal_reward
+    
+    oldsort = self.mkt_retrns[self.step-1,:]
+    newsort = 0
+    stdev_neg_returns = 0
+    
+    if nominal_reward < 0:
+        self.negative_returns = np.append(self.negative_returns, nominal_reward)
+        stdev_neg_returns = np.std(self.negative_returns)
+    else:
+        stdev_neg_returns = np.std(self.negative_returns)
+    if stdev_neg_returns == 0:
+        newsort = self.total_returns / .0001
+    else:
+        newsort = self.total_returns / stdev_neg_returns
+    
+    sortchange = (newsort - oldsort)/oldsort
+    self.mkt_retrns[self.step,:] = newsort
+        
+    
+    
+    
+    
     #reward = ( (bod_posn * retrn) - self.costs[self.step] )
     #pdb.set_trace()
-    self.strat_retrns[self.step] = reward
+    self.strat_retrns[self.step] = sortchange
 
     #if self.step != 0 :
     #  self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
@@ -168,7 +194,7 @@ class TradingSim(object) :
     info = { 'reward': reward,  'costs':self.costs[self.step] }
 
     self.step += 1      
-    return reward, info
+    return sortchange, info
 
   def to_df(self):
     """returns internal state in new dataframe """
@@ -240,6 +266,7 @@ class TradingEnv(gym.Env):
     observation, done = self.src._step()
     # Close    Volume     Return  ClosePctl  VolumePctl
     yret = observation[[2,5]]
+    
 
     reward, info = self.sim._step( action, yret )
       
