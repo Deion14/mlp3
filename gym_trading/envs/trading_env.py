@@ -119,14 +119,14 @@ class TradingSim(object) :
     self.steps            = steps
     # change every step
     self.step             = 0
-    self.actions          = np.zeros(self.steps)
+    self.actions          = np.zeros((self.steps,2))
     self.navs             = np.ones(self.steps)
     self.mkt_nav         = np.ones(self.steps)
     self.strat_retrns     = np.ones(self.steps)
     self.posns            = np.zeros(self.steps)
     self.costs            = np.zeros(self.steps)
     self.trades           = np.zeros(self.steps)
-    self.mkt_retrns       = np.zeros(self.steps)
+    self.mkt_retrns       = np.zeros((self.steps,2))
     
   def reset(self):
     self.step = 0
@@ -143,26 +143,29 @@ class TradingSim(object) :
     """ Given an action and return for prior period, calculates costs, navs,
         etc and returns the reward and a  summary of the day's activity. """
 
-    bod_posn = 0.0 if self.step == 0 else self.posns[self.step-1]
-    bod_nav  = 1.0 if self.step == 0 else self.navs[self.step-1]
-    mkt_nav  = 1.0 if self.step == 0 else self.mkt_nav[self.step-1]
+    #bod_posn = 0.0 if self.step == 0 else self.posns[self.step-1]
+    #bod_nav  = 1.0 if self.step == 0 else self.navs[self.step-1]
+    #mkt_nav  = 1.0 if self.step == 0 else self.mkt_nav[self.step-1]
 
-    self.mkt_retrns[self.step] = retrn
-    self.actions[self.step] = action
+    self.mkt_retrns[self.step,:] = retrn
+    self.actions[self.step,:] = action
     
-    self.posns[self.step] = action - 1     
-    self.trades[self.step] = self.posns[self.step] - bod_posn
+    #self.posns[self.step] = action - 1     
+    #self.trades[self.step] = self.posns[self.step] - bod_posn
     
     trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
     self.costs[self.step] = trade_costs_pct +  self.time_cost_bps
-    reward = ( (bod_posn * retrn) - self.costs[self.step] )
+    reward= np.dot(retrn, action)-self.costs[self.step]
+    #reward = ( (bod_posn * retrn) - self.costs[self.step] )
+    #pdb.set_trace()
     self.strat_retrns[self.step] = reward
 
-    if self.step != 0 :
-      self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
-      self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
+    #if self.step != 0 :
+    #  self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
+    #  self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
     
-    info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
+    #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
+    info = { 'reward': reward,  'costs':self.costs[self.step] }
 
     self.step += 1      
     return reward, info
@@ -173,7 +176,9 @@ class TradingSim(object) :
             'position','costs', 'trade' ]
     rets = _prices2returns(self.navs)
     #pdb.set_trace()
-    df = pd.DataFrame( {'action':     self.actions, # today's action (from agent)
+    df = pd.DataFrame( )
+    """    
+        {'action':     self.actions, # today's action (from agent)
                           'bod_nav':    self.navs,    # BOD Net Asset Value (NAV)
                           'mkt_nav':  self.mkt_nav, 
                           'mkt_return': self.mkt_retrns,
@@ -182,6 +187,7 @@ class TradingSim(object) :
                           'costs':  self.costs,   # eod costs
                           'trade':  self.trades },# eod trade
                          columns=cols)
+                             """
     return df
 
 class TradingEnv(gym.Env):
@@ -230,10 +236,10 @@ class TradingEnv(gym.Env):
     return [seed]
 
   def _step(self, action):
-    assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
+    #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
     observation, done = self.src._step()
     # Close    Volume     Return  ClosePctl  VolumePctl
-    yret = observation[2]
+    yret = observation[[2,5]]
 
     reward, info = self.sim._step( action, yret )
       

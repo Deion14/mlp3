@@ -89,9 +89,10 @@ class PolicyGradient(object) :
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
         logp = tf.matmul(h, self._tf_model['W2'])
-        tf.Print(logp,logp)
-        p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
-        #p = tf.nn.softmax(logp)
+        sign=tf.sign(logp)
+        #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
+        absLogP=tf.abs(logp)
+        p = tf.nn.softmax(absLogP)
         return p
 
     def train_model(self, env, episodes=100, 
@@ -126,15 +127,16 @@ class PolicyGradient(object) :
         victory = False
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
-            pdb.set_trace()
+            #pdb.set_trace()
             x = observation
             feed = {self._tf_x: np.reshape(x, (1,-1))}
             aprob = self._sess.run(self._tf_aprob,feed)
             aprob = aprob[0,:] # we live in a batched world :/
-
-            action = np.random.choice(self._num_actions, p=aprob)
-            label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
-
+            action=aprob
+            #action = np.random.choice(self._num_actions, p=aprob)
+            #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
+            label=action
+            
             # step the environment and get new measurements
             observation, reward, done, info = env.step(action)
             #print observation, reward, done, info
@@ -147,23 +149,24 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
+                print(running_reward)
                 epx = np.vstack(xs)
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
                 xs,rs,ys = [],[],[] # reset game history
-                df = env.sim.to_df()
+                #df = env.sim.to_df()
                 #pdb.set_trace()
-                simrors[episode]=df.bod_nav.values[-1]-1 # compound returns
-                mktrors[episode]=df.mkt_nav.values[-1]-1
+                #simrors[episode]=df.bod_nav.values[-1]-1 # compound returns
+                #mktrors[episode]=df.mkt_nav.values[-1]-1
 
-                alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
+                #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
                 
                 feed = {self._tf_x: epx, self._tf_epr: epr, self._tf_y: epy}
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
                 if episode % log_freq == 0:
-                    log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
-                             running_reward, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
+                    #log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
+                    #         running_reward, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
                     save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
                                                  global_step=episode+1)
                     if episode > 100:
