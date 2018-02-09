@@ -9,7 +9,7 @@ from numpy import random
 import pandas as pd
 import logging
 import pdb
-
+from sklearn import preprocessing
 import tempfile
 
 log = logging.getLogger(__name__)
@@ -80,13 +80,26 @@ class QuandlEnvSrc(object):
         
         
     AAPL=AAPL.set_index(np.arange(0,len(A)))
-    A=A.join(AAPL, lsuffix='A', rsuffix='AAPL')
+    #myList = ["stock"+str(i) for i in range(10)]
+    A=A.join(AAPL, lsuffix='Stock1', rsuffix='Stock2')
+    #pdb.set_trace()
+    A=A.iloc[1:,:]
+    
     df = np.dstack((stocks[0], stocks[1])) 
     df[0,2,0] = 0
     df[0,2,1] = 0
-   
+    
+    # rename and standardize
     df=A
+    colNames=list(df)
+    #pdb.set_trace()
+    
+    removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
+    Dim=3
+    colNames = [i for j, i in enumerate(colNames) if j not in range(Dim-1,2*Dim,Dim)]
 
+    df[colNames] = df[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
+    
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
     self.data = df
@@ -107,7 +120,10 @@ class QuandlEnvSrc(object):
     self.idx += 1
     self.step += 1
     done = self.step >= self.days
-    return obs,done
+    #pdb.set_trace()
+    returns=self.data.iloc[:self.idx,[3,5]] #past returns of stocks
+    
+    return obs,done,returns
 
 class TradingSim(object) :
   """ Implements core trading simulator for single-instrument univ """
@@ -156,14 +172,16 @@ class TradingSim(object) :
 
     trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
     self.costs[self.step] = trade_costs_pct +  self.time_cost_bps
-    reward= np.dot(retrn, action)-self.costs[self.step]
     
-    nominal_reward = np.dot(retrn, action) - self.costs[self.step]
+
+    reward= np.dot(retrn, action.reshape(-1,1))-self.costs[self.step]
+
+    nominal_reward = np.dot(retrn, action.reshape(-1,1)) - self.costs[self.step]
     self.total_returns = self.total_returns + nominal_reward
-    
+
     oldsort = self.mkt_retrns[self.step-1,:]
-        
     newsort = 0
+    sortchange = 0
     stdev_neg_returns = 0
     
     if nominal_reward < 0:
@@ -176,17 +194,19 @@ class TradingSim(object) :
     else:
         newsort = self.total_returns / stdev_neg_returns
     
+
     if oldsort == 0:
         sortchange = newsort
     else:
         sortchange = (newsort - oldsort)/oldsort
+
         
     self.mkt_retrns[self.step,:] = newsort
              
     
     #reward = ( (bod_posn * retrn) - self.costs[self.step] )
     #pdb.set_trace()
-    self.strat_retrns[self.step] = sortchange
+   # self.strat_retrns[self.step] = sortchange
 
     #if self.step != 0 :
     #  self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
@@ -195,8 +215,10 @@ class TradingSim(object) :
     #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
     info = { 'reward': reward,  'costs':self.costs[self.step] }
 
+
     self.step += 1      
     return sortchange, newsort, info
+
 
   def to_df(self):
     """returns internal state in new dataframe """
@@ -251,8 +273,9 @@ class TradingEnv(gym.Env):
     self.src = QuandlEnvSrc(days=self.days)
     self.sim = TradingSim(steps=self.days, trading_cost_bps=1e-3,
                           time_cost_bps=1e-4)
-    #self.action_space = spaces.Discrete( 3 )
-    self.action_space = spaces.Box(-1.0, 1.0, shape=(1, 1))
+
+    self.action_space =  spaces.Box(low=-1, high=1, shape=(2,))
+
     self.observation_space= spaces.Box( self.src.min_values,
                                         self.src.max_values)
     self._reset()
@@ -266,7 +289,7 @@ class TradingEnv(gym.Env):
 
   def _step(self, action):
     #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
-    observation, done = self.src._step()
+    observation, done, Returns = self.src._step()
     # Close    Volume     Return  ClosePctl  VolumePctl
     yret = observation[[2,5]]
     
@@ -275,12 +298,16 @@ class TradingEnv(gym.Env):
       
     #info = { 'pnl': daypnl, 'nav':self.nav, 'costs':costs }
 
-    return observation, reward, done, sort, info
+    return observation, reward, done, sort, info, Returns
+
   
   def _reset(self):
     self.src.reset()
     self.sim.reset()
-    return self.src._step()[0]
+    out=self.src._step()#,self.src._step()[2] 
+    
+    
+    return out[0], out[2]#changes this form [0] to this 
     
   def _render(self, mode='human', close=False):
     #... TODO

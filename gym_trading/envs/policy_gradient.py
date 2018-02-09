@@ -96,14 +96,29 @@ class PolicyGradient(object) :
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
         logp = tf.matmul(h, self._tf_model['W2'])
+        
+        #tf.random_normal([1,tf.shape(logp)], mean=0.0, stddev=1.0)
+        
         sign=tf.sign(logp)
         #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
         absLogP=tf.abs(logp)
-        p = tf.nn.softmax(absLogP)
 
-
-        return p
-
+        p = tf.multiply(sign,tf.nn.softmax(absLogP))
+        
+        
+        return p,logp
+    
+    
+    def GaussianNoise(inputs, returns):
+        
+        variance=np.var(returns,axis=0)
+        noise=np.random.normal(0,variance)
+        t1=  inputs+noise
+        output=t1/t1.sum() 
+        return output
+    
+    
+    
     def train_model(self, env, episodes=100, 
                     load_model = False,  # load model from checkpoint if available:?
                     model_dir = '/tmp/pgmodel/', log_freq=10 ) :
@@ -124,7 +139,12 @@ class PolicyGradient(object) :
             os.makedirs(model_dir)
 
         episode = 0
-        observation = env.reset()
+        observation,Returns = env.reset()
+        
+#        x = observation[0]
+#        Returns = observation[1]
+        
+        
         xs,rs,ys = [],[],[]    # environment info
         running_reward = 0    
         reward_sum = 0
@@ -136,23 +156,26 @@ class PolicyGradient(object) :
         victory = False
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
-            #pdb.set_trace()
-            #x  = tf.placeholder("float", [num_input, 6])
 
             
-            x = observation
+            x=observation
             feed = {self._tf_x: np.reshape(x, (1,-1))}
-            z = np.reshape(x, (1,-1))
-            aprob = self._sess.run(self._tf_aprob,feed)
-
-            aprob = aprob[0,:] # we live in a batched world :/
+            #print(episode)
+            
+            aprob,logp = self._sess.run(self._tf_aprob,feed)
+            #aprob = aprob[0,:] # we live in a batched world :/
+            
+            print(aprob)
+            aprob=PolicyGradient.GaussianNoise(aprob,Returns)
             action=aprob
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
             
             # step the environment and get new measurements
-            observation, reward, done, sort, info = env.step(action)
+
+            observation, reward, done, sort, info, Returns = env.step(action)
+
             #print observation, reward, done, info
             reward_sum += reward
 
@@ -198,7 +221,7 @@ class PolicyGradient(object) :
                 
                     
                 episode += 1
-                observation = env.reset()
+                observation,Returns = env.reset()
                 reward_sum = 0
                 day = 0
                 
