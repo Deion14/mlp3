@@ -162,6 +162,7 @@ class TradingSim(object) :
     self.total_returns = self.total_returns + nominal_reward
     
     oldsort = self.mkt_retrns[self.step-1,:]
+        
     newsort = 0
     stdev_neg_returns = 0
     
@@ -175,12 +176,13 @@ class TradingSim(object) :
     else:
         newsort = self.total_returns / stdev_neg_returns
     
-    sortchange = (newsort - oldsort)/oldsort
-    self.mkt_retrns[self.step,:] = newsort
+    if oldsort == 0:
+        sortchange = newsort
+    else:
+        sortchange = (newsort - oldsort)/oldsort
         
-    
-    
-    
+    self.mkt_retrns[self.step,:] = newsort
+             
     
     #reward = ( (bod_posn * retrn) - self.costs[self.step] )
     #pdb.set_trace()
@@ -194,7 +196,7 @@ class TradingSim(object) :
     info = { 'reward': reward,  'costs':self.costs[self.step] }
 
     self.step += 1      
-    return sortchange, info
+    return sortchange, newsort, info
 
   def to_df(self):
     """returns internal state in new dataframe """
@@ -249,10 +251,11 @@ class TradingEnv(gym.Env):
     self.src = QuandlEnvSrc(days=self.days)
     self.sim = TradingSim(steps=self.days, trading_cost_bps=1e-3,
                           time_cost_bps=1e-4)
-    self.action_space = spaces.Discrete( 3 )
+    #self.action_space = spaces.Discrete( 3 )
+    self.action_space = spaces.Box(-1.0, 1.0, shape=(1, 1))
     self.observation_space= spaces.Box( self.src.min_values,
                                         self.src.max_values)
-    #self.reset()
+    self._reset()
 
   def _configure(self, display=None):
     self.display = display
@@ -268,11 +271,11 @@ class TradingEnv(gym.Env):
     yret = observation[[2,5]]
     
 
-    reward, info = self.sim._step( action, yret )
+    reward, sort, info = self.sim._step( action, yret )
       
     #info = { 'pnl': daypnl, 'nav':self.nav, 'costs':costs }
 
-    return observation, reward, done, info
+    return observation, reward, done, sort, info
   
   def _reset(self):
     self.src.reset()

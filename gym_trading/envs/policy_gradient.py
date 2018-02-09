@@ -77,12 +77,19 @@ class PolicyGradient(object) :
         optimizer = tf.train.RMSPropOptimizer(learning_rate, decay=decay)
         tf_grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables(), 
                                                grad_loss=self._tf_discounted_epr)
+        tf_grads = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in tf_grads]
+
         self._train_op = optimizer.apply_gradients(tf_grads)
     
     def tf_discount_rewards(self, tf_r): #tf_r ~ [game_steps,1]
         discount_f = lambda a, v: a*self._gamma + v;
-        tf_r_reverse = tf.scan(discount_f, tf.reverse(tf_r,[True, False]))
-        tf_discounted_r = tf.reverse(tf_r_reverse,[True, False])
+        tf_r_reverse = tf.scan(discount_f, tf.reverse(tf_r,[0]))
+        tf_discounted_r = tf.reverse(tf_r_reverse,[0])
+        tf_discounted_r = tf.clip_by_value(tf_discounted_r, -1., 1.)
+
+
+        #tf_r_reverse = tf.scan(discount_f, tf.reverse(tf_r,[True, False]))
+        #tf_discounted_r = tf.reverse(tf_r_reverse,[True, False])
         return tf_discounted_r
 
     def tf_policy_forward(self, x): #x ~ [1,D]
@@ -93,6 +100,8 @@ class PolicyGradient(object) :
         #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
         absLogP=tf.abs(logp)
         p = tf.nn.softmax(absLogP)
+
+
         return p
 
     def train_model(self, env, episodes=100, 
@@ -128,9 +137,14 @@ class PolicyGradient(object) :
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
             #pdb.set_trace()
+            #x  = tf.placeholder("float", [num_input, 6])
+
+            
             x = observation
             feed = {self._tf_x: np.reshape(x, (1,-1))}
+            z = np.reshape(x, (1,-1))
             aprob = self._sess.run(self._tf_aprob,feed)
+
             aprob = aprob[0,:] # we live in a batched world :/
             action=aprob
             #action = np.random.choice(self._num_actions, p=aprob)
@@ -138,9 +152,10 @@ class PolicyGradient(object) :
             label=action
             
             # step the environment and get new measurements
-            observation, reward, done, info = env.step(action)
+            observation, reward, done, sort, info = env.step(action)
             #print observation, reward, done, info
             reward_sum += reward
+
 
             # record game history
             xs.append(x)
@@ -149,10 +164,11 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                print(running_reward)
+
                 epx = np.vstack(xs)
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
+
                 xs,rs,ys = [],[],[] # reset game history
                 #df = env.sim.to_df()
                 #pdb.set_trace()
@@ -165,10 +181,11 @@ class PolicyGradient(object) :
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
                 if episode % log_freq == 0:
-                    #log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
-                    #         running_reward, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
+                    log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
+                             sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
                     save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
                                                  global_step=episode+1)
+                    print(sort)
                     if episode > 100:
                         vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
                                                'mkt': mktrors[episode-100:episode] } )
