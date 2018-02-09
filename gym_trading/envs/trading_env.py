@@ -48,8 +48,7 @@ class QuandlEnvSrc(object):
     df = quandl.get_table('WIKI/PRICES', ticker=['A','AAPL'], qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
     log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
     
- 
-    
+    '''
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
     #print(df.shape)
     # we calculate returns and percentiles, then kill nans
@@ -92,14 +91,47 @@ class QuandlEnvSrc(object):
     # rename and standardize
     df=A
     colNames=list(df)
-    #pdb.set_trace()
+    #pdb.set_trace()    '''
     
-    removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
+    
+    Stocks=['A','AAPL']
+    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) 
+
+    df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
+    #print(df.shape)
+    # we calculate returns and percentiles, then kill nans
+    df = df[['ticker','adj_close','volume']] 
+    df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
+    df['Return'] = (df.adj_close-df.adj_close.shift())/df.adj_close.shift()
+    #df['Return2Day'] = (df.adj_close-df.adj_close.shift(periods=2))/df.adj_close.shift(periods=2)
+    #df['Return5Day'] = (df.adj_close-df.adj_close.shift(periods=5))/df.adj_close.shift(periods=5)
+    #df['Return10Day'] = (df.adj_close-df.adj_close.shift(periods=10))/df.adj_close.shift(periods=10)
+    pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
+    names=["Stock"+str(i) for i in range(1,3)]
+    
+    for i ,j in enumerate(Stocks):
+    
+        print(i)
+        if i==0:
+            DF=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
+        elif i==1:
+            stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
+            stock1=  stock1.set_index(np.arange(0,len(stock1)))
+            DF=DF.join(stock1, lsuffix='Stock1', rsuffix='Stock2')
+
+        else:
+            stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
+            stock1=  stock1.set_index(np.arange(0,len(stock1)))
+            DF.join(df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 ), rsuffix=names[i-2])
+        
+    DF=DF.iloc[1:] # remove 1st 10 
+    colNames=list(DF)
+    #removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
     Dim=3
     colNames = [i for j, i in enumerate(colNames) if j not in range(Dim-1,2*Dim,Dim)]
 
-    df[colNames] = df[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
-    
+    DF[colNames] = DF[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
+    df=DF
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
     self.data = df

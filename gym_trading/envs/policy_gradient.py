@@ -42,6 +42,7 @@ class PolicyGradient(object) :
         self._tf_model = {}
         self._num_actions = num_actions
         hidden_neurons = obs_dim * neurons_per_dim
+        '''
         with tf.variable_scope('layer_one',reuse=tf.AUTO_REUSE):
             L1 = tf.truncated_normal_initializer(mean=0,
                                                  stddev=1./np.sqrt(obs_dim),
@@ -49,12 +50,31 @@ class PolicyGradient(object) :
             self._tf_model['W1'] = tf.get_variable("W1",
                                                    [obs_dim, hidden_neurons],
                                                    initializer=L1)
-        with tf.variable_scope('layer_two',reuse=False):
+        with tf.variable_scope('layer_two',reuse=tf.AUTO_REUSE):
             L2 = tf.truncated_normal_initializer(mean=0,
                                                  stddev=1./np.sqrt(hidden_neurons),
                                                  dtype=tf.float32)
             self._tf_model['W2'] = tf.get_variable("W2",
                                                    [hidden_neurons,num_actions],
+                                                   initializer=L2) '''
+        ######################   
+        NumberOfLayers=2
+        self.NumofLayers=range(0,NumberOfLayers)
+        whichLayers= ["layer_one","layer_two"]
+        self.NameW=["W1", "W2"]
+        InputDimensions=[obs_dim, hidden_neurons]
+        OutputDimensions=[hidden_neurons, self._num_actions]
+        for  i in self.NumofLayers:   
+            whichLayer=whichLayers[i]
+            inputsDim=InputDimensions[i]
+            outputDim=OutputDimensions[i]
+            NameW  =self.NameW[i]
+            with tf.variable_scope(whichLayer,reuse=tf.AUTO_REUSE):
+                L2 = tf.truncated_normal_initializer(mean=0,
+                                                 stddev=1./np.sqrt(hidden_neurons),
+                                                 dtype=tf.float32)
+                self._tf_model[NameW] = tf.get_variable(NameW,
+                                                   [inputsDim,outputDim],
                                                    initializer=L2)
        
         # tf placeholders
@@ -93,12 +113,31 @@ class PolicyGradient(object) :
         return tf_discounted_r
 
     def tf_policy_forward(self, x): #x ~ [1,D]
+        
+        '''
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
-        logp = tf.matmul(h, self._tf_model['W2'])
+        logp = tf.matmul(h, self._tf_model['W2']) '''
         
-        #tf.random_normal([1,tf.shape(logp)], mean=0.0, stddev=1.0)
+        #################        #################        #################
         
+        for i in self.NumofLayers:
+
+            if i ==0:
+                 print(self.NameW[i])
+                 h = tf.matmul(x, self._tf_model[self.NameW[i]])
+                 h = tf.nn.relu(h)
+            elif i>0 and i < max(self.NumofLayers):
+                 h = tf.matmul(h, self._tf_model[self.NameW[i]])
+                 h = tf.nn.relu(h)
+            else:
+                 h = tf.matmul(h, self._tf_model[self.NameW[i]])
+
+        
+        
+                #################        #################        #################
+        pdb.set_trace()     
+        logp=h
         sign=tf.sign(logp)
         #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
         absLogP=tf.abs(logp)
