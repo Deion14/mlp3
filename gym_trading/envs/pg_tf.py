@@ -114,7 +114,7 @@ class ValueModel:
 
     #initilize RNN
     num_hidden = 24
-    value_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+    value_cell = tf.nn.rnn_cell.BasicLSTMCell(num_hidden,state_is_tuple=True)
 
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X_for_value')
@@ -142,7 +142,7 @@ class ValueModel:
 
   def partial_fit(self, X, Y):
 
-    X = np.reshape(X, (-1, 6))
+    X = np.reshape(X, (-1, 6, 1))
     Y = np.reshape(Y, (-1, 2))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
@@ -150,7 +150,7 @@ class ValueModel:
 
   def predict(self, X):
 
-    X = np.reshape(X, (-1, 6))
+    X = np.reshape(X, (-1, 6, 1))
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
@@ -166,12 +166,12 @@ def play_one_td(env, pmodel, vmodel, gamma):
     
     action = pmodel.sample_action(observation)
     prev_observation = observation
-    observation, reward, done, _, info, _ = env.step(action)
+    observation, reward, done, sort , info, _ = env.step(action)
     
     if observation.shape == (1,2):
         print('Stop')
 
-    totalreward += reward
+    totalreward = sort
 
     # update the models
     V_next = vmodel.predict(observation)

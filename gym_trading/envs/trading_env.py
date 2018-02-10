@@ -188,6 +188,7 @@ class TradingSim(object) :
     self.costs.fill(0)
     self.trades.fill(0)
     self.mkt_retrns.fill(0)
+    self.total_returns = 0
     
   def _step(self, action, retrn ):
     """ Given an action and return for prior period, calculates costs, navs,
