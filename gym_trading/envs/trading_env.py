@@ -45,10 +45,12 @@ class QuandlEnvSrc(object):
     self.auth = auth
     self.days = days+1
     log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
-    df = quandl.get_table('WIKI/PRICES', ticker=['A','AAPL'], qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
+
+    '''
+    df = quandl.get_table('WIKI/PRICES',ticker=ticker, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
     log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
     
-    '''
+
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
     #print(df.shape)
     # we calculate returns and percentiles, then kill nans
@@ -94,13 +96,17 @@ class QuandlEnvSrc(object):
     #pdb.set_trace()    '''
     
     
-    Stocks=['A','AAPL']
+    Stocks=['A','AAPL','MSFT']
+    self.NumberOfStocks=len(Stocks)
+    
     df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) 
-
+    
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
-    #print(df.shape)
+    
     # we calculate returns and percentiles, then kill nans
     df = df[['ticker','adj_close','volume']] 
+    self.Dimension=len(list(df))
+    
     df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
     df['Return'] = (df.adj_close-df.adj_close.shift())/df.adj_close.shift()
     #df['Return2Day'] = (df.adj_close-df.adj_close.shift(periods=2))/df.adj_close.shift(periods=2)
@@ -110,8 +116,6 @@ class QuandlEnvSrc(object):
     names=["Stock"+str(i) for i in range(1,3)]
     
     for i ,j in enumerate(Stocks):
-    
-        print(i)
         if i==0:
             DF=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
         elif i==1:
@@ -120,17 +124,19 @@ class QuandlEnvSrc(object):
             DF=DF.join(stock1, lsuffix='Stock1', rsuffix='Stock2')
 
         else:
+
             stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
             stock1=  stock1.set_index(np.arange(0,len(stock1)))
-            DF.join(df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 ), rsuffix=names[i-2])
+            DF=DF.join(stock1, rsuffix=names[i-2])
         
     DF=DF.iloc[1:] # remove 1st 10 
     colNames=list(DF)
     #removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
-    Dim=3
-    colNames = [i for j, i in enumerate(colNames) if j not in range(Dim-1,2*Dim,Dim)]
+    
+    colNames = [i for j, i in enumerate(colNames) if j not in range(self.Dimension-1,self.NumberOfStocks*self.Dimension,self.Dimension)]
 
     DF[colNames] = DF[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
+    
     df=DF
     self.min_values = df.min(axis=0)
     self.max_values = df.max(axis=0)
@@ -153,21 +159,25 @@ class QuandlEnvSrc(object):
     self.step += 1
     done = self.step >= self.days
     #pdb.set_trace()
-    returns=self.data.iloc[:self.idx,[3,5]] #past returns of stocks
+
+    retAllStocks=list(np.arange(self.Dimension-1,self.Dimension*self.NumberOfStocks,self.Dimension ))
+    returns=self.data.iloc[:self.idx,retAllStocks] #past returns of stocks
     
     return obs,done,returns
 
 class TradingSim(object) :
   """ Implements core trading simulator for single-instrument univ """
 
-  def __init__(self, steps, trading_cost_bps = 1e-3, time_cost_bps = 1e-4):
+  def __init__(self, steps, trading_cost_bps = 1e-3, time_cost_bps = 1e-4,NumberOfStocks=2):
+
     # invariant for object life
+    self.NumberOfStocks   =NumberOfStocks
     self.trading_cost_bps = trading_cost_bps
     self.time_cost_bps    = time_cost_bps
     self.steps            = steps
     # change every step
     self.step             = 0
-    self.actions          = np.zeros((self.steps,2))
+    self.actions          = np.zeros((self.steps,self.NumberOfStocks))
     self.navs             = np.ones(self.steps)
     self.mkt_nav         = np.ones(self.steps)
     self.strat_retrns     = np.ones(self.steps)
@@ -188,6 +198,7 @@ class TradingSim(object) :
     self.costs.fill(0)
     self.trades.fill(0)
     self.mkt_retrns.fill(0)
+    self.total_returns    = 0
     
   def _step(self, action, retrn ):
     """ Given an action and return for prior period, calculates costs, navs,
@@ -215,12 +226,14 @@ class TradingSim(object) :
     newsort = 0
     sortchange = 0
     stdev_neg_returns = 0
+    self.negative_returns = [0]
     
     if nominal_reward < 0:
         self.negative_returns = np.append(self.negative_returns, nominal_reward)
         stdev_neg_returns = np.std(self.negative_returns)
     else:
         stdev_neg_returns = np.std(self.negative_returns)
+        
     if stdev_neg_returns == 0:
         newsort = self.total_returns / .0001
     else:
@@ -304,9 +317,9 @@ class TradingEnv(gym.Env):
     self.days = 252
     self.src = QuandlEnvSrc(days=self.days)
     self.sim = TradingSim(steps=self.days, trading_cost_bps=1e-3,
-                          time_cost_bps=1e-4)
+                          time_cost_bps=1e-4,NumberOfStocks=self.src.NumberOfStocks)
 
-    self.action_space =  spaces.Box(low=-1, high=1, shape=(2,))
+    self.action_space =  spaces.Box(low=-1, high=1, shape=(self.src.NumberOfStocks,))
 
     self.observation_space= spaces.Box( self.src.min_values,
                                         self.src.max_values)
@@ -322,13 +335,11 @@ class TradingEnv(gym.Env):
   def _step(self, action):
     #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
     observation, done, Returns = self.src._step()
-    # Close    Volume     Return  ClosePctl  VolumePctl
-    yret = observation[[2,5]]
+    retAllStocks=list(np.arange(self.src.Dimension-1,self.src.Dimension*self.src.NumberOfStocks,self.src.Dimension ))
+    yret = observation[retAllStocks]
     
 
     reward, sort, info = self.sim._step( action, yret )
-      
-    #info = { 'pnl': daypnl, 'nav':self.nav, 'costs':costs }
 
     return observation, reward, done, sort, info, Returns
 
