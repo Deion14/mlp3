@@ -22,7 +22,7 @@ logging.basicConfig()
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 log.info('%s logger started.',__name__)
-
+np.seterr(all='raise')
 class PolicyGradient(object) :
     """ Policy Gradient implementation in tensor flow.
    """
@@ -31,18 +31,23 @@ class PolicyGradient(object) :
                  sess,                # tensorflow session
                  obs_dim,             # observation shape
                  num_actions,         # number of possible actions
+                 NumOfLayers,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
                  learning_rate=1e-2,  # learning rate
                  gamma = 0.9,         # reward discounting 
                  decay = 0.9          # gradient decay rate
+
                  ):
                  
         self._sess = sess
         self._gamma = gamma
         self._tf_model = {}
         self._num_actions = num_actions
+        self._num_stocks = num_actions
+        self.NumofLayers=NumOfLayers
         hidden_neurons = obs_dim * neurons_per_dim
         '''
+        
         with tf.variable_scope('layer_one',reuse=tf.AUTO_REUSE):
             L1 = tf.truncated_normal_initializer(mean=0,
                                                  stddev=1./np.sqrt(obs_dim),
@@ -56,27 +61,28 @@ class PolicyGradient(object) :
                                                  dtype=tf.float32)
             self._tf_model['W2'] = tf.get_variable("W2",
                                                    [hidden_neurons,num_actions],
-                                                   initializer=L2) '''
+                                                   initializer=L2) 
         ######################   
-        NumberOfLayers=2
-        self.NumofLayers=range(0,NumberOfLayers)
-        whichLayers= ["layer_one","layer_two"]
-        self.NameW=["W1", "W2"]
-        InputDimensions=[obs_dim, hidden_neurons]
-        OutputDimensions=[hidden_neurons, self._num_actions]
-        for  i in self.NumofLayers:   
+        '''
+        
+        whichLayers=["layer_"+str(i) for i in range(1, self.NumofLayers+1)]
+        self.NameW=["W"+str(i) for i in range(1, self.NumofLayers+1)]
+        InputDimensions=[obs_dim]+ [hidden_neurons for i in range(0, self.NumofLayers-1)]
+        OutputDimensions=[hidden_neurons for i in range(0, self.NumofLayers-1)]+[self._num_actions]
+        for  i in range(self.NumofLayers):   
             whichLayer=whichLayers[i]
             inputsDim=InputDimensions[i]
             outputDim=OutputDimensions[i]
             NameW  =self.NameW[i]
             with tf.variable_scope(whichLayer,reuse=tf.AUTO_REUSE):
-                L2 = tf.truncated_normal_initializer(mean=0,
-                                                 stddev=1./np.sqrt(hidden_neurons),
-                                                 dtype=tf.float32)
+                L2 = tf.contrib.layers.xavier_initializer(uniform=False, seed=1, dtype=tf.float32)
+                #tf.truncated_normal_initializer(mean=0,
+                      #                           stddev=1./np.sqrt(hidden_neurons),
+                       #                          dtype=tf.float32)
                 self._tf_model[NameW] = tf.get_variable(NameW,
                                                    [inputsDim,outputDim],
                                                    initializer=L2)
-       
+        
         # tf placeholders
         self._tf_x = tf.placeholder(dtype=tf.float32, shape=[None, obs_dim],name="tf_x")
         self._tf_y = tf.placeholder(dtype=tf.float32, shape=[None, num_actions],name="tf_y")
@@ -117,27 +123,28 @@ class PolicyGradient(object) :
         '''
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
-        logp = tf.matmul(h, self._tf_model['W2']) '''
+        logp = tf.matmul(h, self._tf_model['W2']) 
         
         #################        #################        #################
-        
-        for i in self.NumofLayers:
+        '''
+        for i in range(0,self.NumofLayers):
 
             if i ==0:
-                 print(self.NameW[i])
+                
                  h = tf.matmul(x, self._tf_model[self.NameW[i]])
                  h = tf.nn.relu(h)
-            elif i>0 and i < max(self.NumofLayers):
+            elif i>0 and i < max(range(self.NumofLayers)):
                  h = tf.matmul(h, self._tf_model[self.NameW[i]])
                  h = tf.nn.relu(h)
             else:
                  h = tf.matmul(h, self._tf_model[self.NameW[i]])
+                 logp=h
 
         
         
                 #################        #################        #################
-        pdb.set_trace()     
-        logp=h
+
+        
         sign=tf.sign(logp)
         #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
         absLogP=tf.abs(logp)
@@ -150,10 +157,14 @@ class PolicyGradient(object) :
     
     def GaussianNoise(inputs, returns):
         
-        variance=np.var(returns,axis=0)
-        noise=np.random.normal(0,variance)
-        t1=  inputs+noise
-        output=t1/t1.sum() 
+        stdd=np.std(returns,axis=0)
+        noise=np.random.normal(0,stdd)
+        t1=  (inputs+noise)
+        if abs(t1).sum()==0:
+            print("Yup some zero variance shit here")
+            output=t1
+        else:
+             output=t1/abs(t1).sum() 
         return output
     
     
@@ -199,14 +210,15 @@ class PolicyGradient(object) :
             
             x=observation
             feed = {self._tf_x: np.reshape(x, (1,-1))}
-            #print(episode)
+           
             
             aprob,logp = self._sess.run(self._tf_aprob,feed)
             #aprob = aprob[0,:] # we live in a batched world :/
-            
-            print(aprob)
+
             aprob=PolicyGradient.GaussianNoise(aprob,Returns)
+            
             action=aprob
+            #print(aprob)
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
@@ -226,7 +238,7 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-
+                print(action)
                 epx = np.vstack(xs)
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
