@@ -49,56 +49,41 @@ class HiddenLayer:
 # approximates pi(a | s)
 class PolicyModel:
   def __init__(self, D, ft, hidden_layer_sizes=[]):
-    self.ft = ft
 
-    ##### hidden layers #####
-    M1 = D
-    self.hidden_layers = []
-    for M2 in hidden_layer_sizes:
-      layer = HiddenLayer(M1, M2)
-      self.hidden_layers.append(layer)
-      M1 = M2
-
-    # final layer mean
-    self.mean_layer = HiddenLayer(M1, 2, lambda x: x, use_bias=False, zeros=True)
-
-    # final layer variance
-    self.stdv_layer = HiddenLayer(M1, 2, tf.nn.softplus, use_bias=False, zeros=False)
-
+    
+    #initilize RNN
+    num_hidden = 24
+    cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+    
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, D), name='X')
-    self.actions = tf.placeholder(tf.float32, shape=(None,), name='actions')
-    self.advantages = tf.placeholder(tf.float32, shape=(None,), name='advantages')
+    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X')
+    self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
+    self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
+    
+    weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+    bias = tf.Variable(tf.constant(0.1, shape=[2]))
 
     # get final hidden layer
-    Z = self.X
-    for layer in self.hidden_layers:
-      Z = layer.forward(Z)
+    val, _  = tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32)
+    val = tf.transpose(val, [1, 0, 2])
+    last = tf.gather(val, int(val.get_shape()[0]) - 1)
+    
+    Z = tf.nn.softmax(tf.matmul(last, weight) + bias)
 
-    # calculate output and cost
-    mean = self.mean_layer.forward(Z)
-    stdv = self.stdv_layer.forward(Z) + 1e-5 # smoothing
+    self.predict_op = Z
 
-    # make them 1-D
-    mean = tf.reshape(mean, [-1])
-    stdv = tf.reshape(stdv, [-1]) 
-
-    norm = tf.contrib.distributions.Normal(mean, stdv)
-    self.predict_op = tf.clip_by_value(norm.sample(), -1, 1)
-
-    log_probs = norm.log_prob(self.actions)
-    cost = -tf.reduce_sum(self.advantages * log_probs + 0.1*norm.entropy())
+    cost = -tf.reduce_sum(self.advantages * self.actions + Z)
     self.train_op = tf.train.AdamOptimizer(1e-3).minimize(cost)
 
   def set_session(self, session):
     self.session = session
 
   def partial_fit(self, X, actions, advantages):
-    X = np.atleast_2d(X)
-    #X = self.ft.transform(X)
     
-    actions = np.atleast_1d(actions)
-    advantages = np.atleast_1d(advantages)
+    X = np.reshape(X, (-1, 6, 1))
+    
+    actions = np.reshape(actions, (-1, 2))
+    advantages = np.reshape(advantages, (-1, 2))
     self.session.run(
       self.train_op,
       feed_dict={
@@ -109,11 +94,12 @@ class PolicyModel:
     )
 
   def predict(self, X):
-    X = np.atleast_2d(X)
+    
     #X = self.ft.transform(X)
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
   def sample_action(self, X):
+    X = np.reshape(X, (-1, 6, 1))  
     p = self.predict(X)
     return p
 
@@ -133,12 +119,12 @@ class ValueModel:
       M1 = M2
 
     # final layer
-    layer = HiddenLayer(M1, 1, lambda x: x)
+    layer = HiddenLayer(M1, 2, lambda x: x)
     self.layers.append(layer)
 
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, D), name='X')
-    self.Y = tf.placeholder(tf.float32, shape=(None,), name='Y')
+    self.Y = tf.placeholder(tf.float32, shape=(None,2), name='Y')
 
     # calculate output and cost
     Z = self.X
@@ -155,16 +141,16 @@ class ValueModel:
     self.session = session
 
   def partial_fit(self, X, Y):
-    X = np.atleast_2d(X)
-    #X = self.ft.transform(X)
-    Y = np.atleast_1d(Y)
+
+    X = np.reshape(X, (-1, 6))
+    Y = np.reshape(Y, (-1, 2))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
     self.costs.append(cost)
 
   def predict(self, X):
-    X = np.atleast_2d(X)
-    #X = self.ft.transform(X)
+
+    X = np.reshape(X, (-1, 6))
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
@@ -177,9 +163,10 @@ def play_one_td(env, pmodel, vmodel, gamma):
   while not done and iters < 2000:
     # if we reach 2000, just quit, don't want this going forever
     # the 200 limit seems a bit early
+    
     action = pmodel.sample_action(observation)
     prev_observation = observation
-    observation, reward, done, _ ,info, _ = env.step(action)
+    observation, reward, done, _, info, _ = env.step(action)
     
     if observation.shape == (1,2):
         print('Stop')
