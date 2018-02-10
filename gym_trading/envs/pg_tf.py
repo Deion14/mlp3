@@ -53,22 +53,24 @@ class PolicyModel:
     
     #initilize RNN
     num_hidden = 24
-    cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+    policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
     
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X')
+    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
     
-    weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
-    bias = tf.Variable(tf.constant(0.1, shape=[2]))
+    with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
+        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+    with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
+        policy_bias = tf.Variable(tf.constant(0.1, shape=[2]))
 
     # get final hidden layer
-    val, _  = tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32)
-    val = tf.transpose(val, [1, 0, 2])
-    last = tf.gather(val, int(val.get_shape()[0]) - 1)
+    p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
+    p_val = tf.transpose(p_val, [1, 0, 2])
+    last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
     
-    Z = tf.nn.softmax(tf.matmul(last, weight) + bias)
+    Z = tf.nn.softmax(tf.matmul(last, policy_weight) + policy_bias)
 
     self.predict_op = Z
 
@@ -110,27 +112,25 @@ class ValueModel:
     self.ft = ft
     self.costs = []
 
-    # create the graph
-    self.layers = []
-    M1 = D
-    for M2 in hidden_layer_sizes:
-      layer = HiddenLayer(M1, M2)
-      self.layers.append(layer)
-      M1 = M2
-
-    # final layer
-    layer = HiddenLayer(M1, 2, lambda x: x)
-    self.layers.append(layer)
+    #initilize RNN
+    num_hidden = 24
+    value_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
 
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, D), name='X')
+    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,2), name='Y')
-
-    # calculate output and cost
-    Z = self.X
-    for layer in self.layers:
-      Z = layer.forward(Z)
-    Y_hat = tf.reshape(Z, [-1]) # the output
+    
+    with tf.variable_scope('value_weight', reuse=tf.AUTO_REUSE):
+        value_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+    with tf.variable_scope('value_biases', reuse=tf.AUTO_REUSE):        
+        value_bias = tf.Variable(tf.constant(0.1, shape=[2]))
+    
+    # get final hidden layer
+    v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
+    v_val = tf.transpose(v_val, [1, 0, 2])
+    last = tf.gather(v_val, int(v_val.get_shape()[0]) - 1)
+    
+    Y_hat = tf.matmul(last, value_weight) + value_bias
     self.predict_op = Y_hat
 
     cost = tf.reduce_sum(tf.square(self.Y - Y_hat))
