@@ -2,6 +2,11 @@
 # https://www.udemy.com/deep-reinforcement-learning-in-python
 from __future__ import print_function, division
 from builtins import range
+
+
+
+
+
 # Note: you may need to update your version of future
 # sudo pip install -U future
 
@@ -48,7 +53,7 @@ class HiddenLayer:
 
 # approximates pi(a | s)
 class PolicyModel:
-  def __init__(self, D, ft, hidden_layer_sizes=[]):
+  def __init__(self, D):
 
     
     #initilize RNN
@@ -56,7 +61,7 @@ class PolicyModel:
     policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
     
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X_for_policy')
+    self.X = tf.placeholder(tf.float32, shape=(None, 6, 1), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
     
@@ -108,8 +113,8 @@ class PolicyModel:
 
 # approximates V(s)
 class ValueModel:
-  def __init__(self, D, ft, hidden_layer_sizes=[]):
-    self.ft = ft
+  def __init__(self, D):
+
     self.costs = []
 
     #initilize RNN
@@ -117,7 +122,7 @@ class ValueModel:
     value_cell = tf.nn.rnn_cell.BasicLSTMCell(num_hidden,state_is_tuple=True)
 
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, D, 1), name='X_for_value')
+    self.X = tf.placeholder(tf.float32, shape=(None, 6, 1), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,2), name='Y')
     
     with tf.variable_scope('value_weight', reuse=tf.AUTO_REUSE):
@@ -158,19 +163,20 @@ def play_one_td(env, pmodel, vmodel, gamma):
   observation,_ = env.reset()
   done = False
   totalreward = 0
-  iters = 0 
+  iters = 0
   
-  while not done and iters < 2000:
-    # if we reach 2000, just quit, don't want this going forever
-    # the 200 limit seems a bit early
+  observations = []
+  rewards = []
+  
+  while not done:
     
     action = pmodel.sample_action(observation)
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
+        
+    observations = np.array(observations)
+    rewards = np.array(rewards)
     
-    if observation.shape == (1,2):
-        print('Stop')
-
     totalreward = sort
 
     # update the models
@@ -192,8 +198,8 @@ def main():
   ft = FeatureTransformer(env, n_components=100)
   #D = ft.dimensions
   D = 6
-  pmodel = PolicyModel(D, ft, [])
-  vmodel = ValueModel(D, ft, [])
+  pmodel = PolicyModel(D)
+  vmodel = ValueModel(D)
   init = tf.global_variables_initializer()
   session = tf.InteractiveSession()
   session.run(init)
