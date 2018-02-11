@@ -77,7 +77,7 @@ class PolicyModel:
     
     Z = tf.matmul(last, policy_weight) + policy_bias
     
-    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=50, dtype=tf.float32)
+    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=1, dtype=tf.float32)
     Z = Z+noise
     
     sign = tf.sign(Z)
@@ -223,7 +223,7 @@ def main():
     monitor_dir = './' + filename + '_' + str(datetime.now())
     env = wrappers.Monitor(env, monitor_dir)
 
-  N = 200
+  N = 2000
   totalrewards = np.empty(N)
   avarage_rewards = np.empty(N)
   costs = np.empty(N)
@@ -239,6 +239,7 @@ def main():
 
   np.savetxt('all_in_one.txt', avarage_rewards)
   plt.plot(avarage_rewards)
+  plt.plot(totalrewards)
   plt.title("Rewards")
   plt.show()
 
