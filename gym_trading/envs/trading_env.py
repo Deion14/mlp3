@@ -201,7 +201,7 @@ class TradingSim(object) :
     self.total_returns    = 0
     
   def _step(self, action, retrn ):
-    """ Given an action and return for prior period, calculates costs, navs,
+      """ Given an action and return for prior period, calculates costs, navs,
         etc and returns the reward and a  summary of the day's activity. """
 
     #bod_posn = 0.0 if self.step == 0 else self.posns[self.step-1]
@@ -212,12 +212,17 @@ class TradingSim(object) :
     self.actions[self.step,:] = action
     #self.posns[self.step] = action - 1     
     #self.trades[self.step] = self.posns[self.step] - bod_posn
+    tradecosts = np.empty_like(action)
+    tradecosts.fill(.0001)
+
+
+    costs = np.dot(tradecosts,abs(action.reshape(-1,1)))
+
 
     trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
-    self.costs[self.step] = trade_costs_pct +  self.time_cost_bps
-    
-
-    reward= np.dot(retrn, action.reshape(-1,1))-self.costs[self.step]
+    self.costs[self.step] = costs
+    #reward= np.dot(retrn, action.reshape(-1,1))-self.costs[self.step]
+    reward= np.dot(retrn, action.reshape(-1,1))-costs
 
     nominal_reward = np.dot(retrn, action.reshape(-1,1)) - self.costs[self.step]
     self.total_returns = self.total_returns + nominal_reward
@@ -226,16 +231,14 @@ class TradingSim(object) :
     newsort = 0
     sortchange = 0
     stdev_neg_returns = 0
-    self.negative_returns = [0]
     
     if nominal_reward < 0:
         self.negative_returns = np.append(self.negative_returns, nominal_reward)
         stdev_neg_returns = np.std(self.negative_returns)
     else:
         stdev_neg_returns = np.std(self.negative_returns)
-        
     if stdev_neg_returns == 0:
-        newsort = self.total_returns / .0001
+        newsort = self.total_returns / .1
     else:
         newsort = self.total_returns / stdev_neg_returns
     
