@@ -32,20 +32,28 @@ class PolicyGradient(object) :
                  obs_dim,             # observation shape
                  num_actions,         # number of possible actions
                  NumOfLayers,
+                 actFunc,
+                 LR,
+                 regulizer=None,
+                 regulizerScale=0.01,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
                  learning_rate=1e-2,  # learning rate
                  gamma = 0.9,         # reward discounting 
                  decay = 0.9          # gradient decay rate
-
-                 ):
                  
+                 ):
+        self.actFunc=actFunc
+        self.Reg= regulizer
+        self.RegScale= regulizerScale    
         self._sess = sess
+        self.learningRule=LR
         self._gamma = gamma
         self._tf_model = {}
         self._num_actions = num_actions
         self._num_stocks = num_actions
         self.NumofLayers=NumOfLayers
         hidden_neurons = obs_dim * neurons_per_dim
+        
         '''
         
         with tf.variable_scope('layer_one',reuse=tf.AUTO_REUSE):
@@ -63,8 +71,10 @@ class PolicyGradient(object) :
                                                    [hidden_neurons,num_actions],
                                                    initializer=L2) 
         ######################   
+        
         '''
         
+        '''
         whichLayers=["layer_"+str(i) for i in range(1, self.NumofLayers+1)]
         self.NameW=["W"+str(i) for i in range(1, self.NumofLayers+1)]
         InputDimensions=[obs_dim]+ [hidden_neurons for i in range(0, self.NumofLayers-1)]
@@ -82,6 +92,7 @@ class PolicyGradient(object) :
                 self._tf_model[NameW] = tf.get_variable(NameW,
                                                    [inputsDim,outputDim],
                                                    initializer=L2)
+        '''
         
         # tf placeholders
         self._tf_x = tf.placeholder(dtype=tf.float32, shape=[None, obs_dim],name="tf_x")
@@ -95,12 +106,44 @@ class PolicyGradient(object) :
         self._tf_discounted_epr -= self._tf_mean
         self._tf_discounted_epr /= tf.sqrt(self._tf_variance + 1e-6)
 
-        self._saver = tf.train.Saver()
+        #self._saver = tf.train.Saver()
 
         # tf optimizer op
-        self._tf_aprob = self.tf_policy_forward(self._tf_x)
+        OutputDimensions=[hidden_neurons for i in range(0, self.NumofLayers-1)]+[self._num_actions]
+        
+        # Different Regularization Rules            
+        if self.Reg=="l2":
+                self.Reg = tf.contrib.layers.l2_regularizer(scale=self.RegScale)
+        elif  self.regul=="l1":
+                self.Reg= tf.contrib.layers.l1_regularizer(scale=self.RegScale)
+        elif  self.Reg=="None":
+                self.Reg= None
+        else:
+            assert("wrong acttivation function")       
+            
+#        pdb.set_trace()
+        self.Reg= None
+        self._tf_aprob = self.tf_policy_forward(self._tf_x,OutputDimensions)
         loss = tf.nn.l2_loss(self._tf_y - self._tf_aprob) # this gradient encourages the actions taken
-        optimizer = tf.train.RMSPropOptimizer(learning_rate, decay=decay)
+
+        
+
+        # Different Learning Rules
+        if self.learningRule=="RMSProp":
+            optimizer = tf.train.RMSPropOptimizer(learning_rate, decay=decay)
+        elif self.learningRule=="Adam":
+            optimizer = tf.train.AdamOptimizer(learning_rate,
+                                               beta1=0.9,
+                                               beta2=0.999)
+        elif self.learningRule=="Mom":
+            optimizer = tf.train.MomentumOptimizer(learning_rate,
+                                                momentum=0.8,
+                                                use_locking=False,
+                                                use_nesterov=True)
+        elif self.learningRule=="GD":
+            optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+            
+        
         tf_grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables(), 
                                                grad_loss=self._tf_discounted_epr)
         tf_grads = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in tf_grads]
@@ -118,13 +161,13 @@ class PolicyGradient(object) :
         #tf_discounted_r = tf.reverse(tf_r_reverse,[True, False])
         return tf_discounted_r
 
-    def tf_policy_forward(self, x): #x ~ [1,D]
+    def tf_policy_forward(self, x,OutputDimensions): #x ~ [1,D]
         
         '''
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
         logp = tf.matmul(h, self._tf_model['W2']) 
-        
+        '''
         #################        #################        #################
         '''
         for i in range(0,self.NumofLayers):
@@ -139,8 +182,73 @@ class PolicyGradient(object) :
             else:
                  h = tf.matmul(h, self._tf_model[self.NameW[i]])
                  logp=h
-
+        '''
         
+        if self.actFunc=="softmax":
+                actFunc=tf.nn.softmax
+        elif  self.actFunc=="relu":
+                actFunc=tf.nn.relu
+        elif self.actFunc=="elu":
+                actFunc= tf.nn.elu
+        else:
+            assert("wrong acttivation function")
+                   
+            
+        init=tf.contrib.layers.xavier_initializer(uniform=False, seed=1, dtype=tf.float32)
+
+        for i in range(0,self.NumofLayers):
+            
+            outputDim=OutputDimensions[i] #OutputDimensions[i]
+           
+            if i ==0:
+                 h=tf.contrib.layers.fully_connected(x,
+                                                    outputDim,
+                                                    activation_fn=actFunc,
+                                                    normalizer_fn=None,
+                                                    normalizer_params=None,
+                                                    weights_initializer=init,
+                                                    weights_regularizer=self.Reg,
+                                                    biases_initializer=tf.zeros_initializer(),
+                                                    biases_regularizer=None,
+                                                    reuse=None,
+                                                    variables_collections=None,
+                                                    outputs_collections=None,
+                                                    trainable=True,
+                                                    scope=None)
+            elif i>0 and i < max(range(self.NumofLayers)):
+                                             
+                 h=tf.contrib.layers.fully_connected(h,
+                                                    outputDim,
+                                                    activation_fn=actFunc,
+                                                    normalizer_fn=None,
+                                                    normalizer_params=None,
+                                                    weights_initializer=init,
+                                                    weights_regularizer=self.Reg,
+                                                    biases_initializer=tf.zeros_initializer(),
+                                                    biases_regularizer=None,
+                                                    reuse=None,
+                                                    variables_collections=None,
+                                                    outputs_collections=None,
+                                                    trainable=True,
+                                                    scope=None)                                                 
+            else:
+                                             
+                 h=tf.contrib.layers.fully_connected(h,
+                                                    outputDim,
+                                                    activation_fn=None,
+                                                    normalizer_fn=None,
+                                                    normalizer_params=None,
+                                                    weights_initializer=init,
+                                                    weights_regularizer=self.Reg,
+                                                    biases_initializer=tf.zeros_initializer(),
+                                                    biases_regularizer=None,
+                                                    reuse=None,
+                                                    variables_collections=None,
+                                                    outputs_collections=None,
+                                                    trainable=True,
+                                                    scope=None)       
+                 logp=h
+    
         
                 #################        #################        #################
 
@@ -238,7 +346,7 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                print(action)
+                #print(action)
                 epx = np.vstack(xs)
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
@@ -257,8 +365,8 @@ class PolicyGradient(object) :
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
-                                                 global_step=episode+1)
+                  #  save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
+                   #                              global_step=episode+1)
                     print(sort)
                     if episode > 100:
                         vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
