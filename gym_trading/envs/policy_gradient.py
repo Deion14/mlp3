@@ -391,3 +391,110 @@ class PolicyGradient(object) :
                 day = 0
                 
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
+    
+    
+    
+ 
+    
+    def test_model(self, env, episodes=100, 
+                    load_model = True,  # load model from checkpoint if available:?
+                    model_dir = "/Users/andrewplaate/mlp3/SavedModels/", log_freq=10 ) :
+                   
+
+        # initialize variables and load model
+        init_op = tf.global_variables_initializer()
+        self._sess.run(init_op)
+        
+        if load_model:
+            ckpt = tf.train.get_checkpoint_state(model_dir)
+            print(tf.train.latest_checkpoint(model_dir))
+            if ckpt and ckpt.model_checkpoint_path:
+                savr = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta')
+                out = savr.restore(self._sess, ckpt.model_checkpoint_path)
+                print("Model restored from ",ckpt.model_checkpoint_path)
+            else:
+                print('No checkpoint found at: ',model_dir)
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+
+        episode = 0
+        observation,Returns = env.reset()
+        
+#        x = observation[0]
+#        Returns = observation[1]
+        
+        
+        xs,rs,ys = [],[],[]    # environment info
+        running_reward = 0    
+        reward_sum = 0
+        # training loop
+        day = 0
+        simrors = np.zeros(episodes)
+        mktrors = np.zeros(episodes)
+        alldf = None
+        victory = False
+        while episode < episodes and not victory:
+            # stochastically sample a policy from the network
+
+            
+            x=observation
+            feed = {self._tf_x: np.reshape(x, (1,-1))}
+           
+            
+            aprob,logp = self._sess.run(self._tf_aprob,feed)
+            
+            #aprob=PolicyGradient.GaussianNoise(aprob,Returns)
+            
+            action=aprob
+            #print(aprob)
+            #action = np.random.choice(self._num_actions, p=aprob)
+            #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
+            label=action
+            
+            # step the environment and get new measurements
+
+            observation, reward, done, sort, info, Returns = env.step(action)
+
+            #print observation, reward, done, info
+            reward_sum += reward
+            print(episode,reward)
+
+            # record game history
+            xs.append(x)
+            ys.append(label)
+            rs.append(reward)
+            day += 1
+            if done:
+               
+                running_reward = running_reward * 0.99 + reward_sum * 0.01
+                epx = np.vstack(xs)
+                epr = np.vstack(rs)
+                epy = np.vstack(ys)
+
+                xs,rs,ys = [],[],[] # reset game history
+                #df = env.sim.to_df()
+                #pdb.set_trace()
+               
+                if episode % log_freq == 0:
+                    log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
+                             sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
+                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
+                                                 global_step=episode+1)
+
+                    if episode > 100:
+                        vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
+                                               'mkt': mktrors[episode-100:episode] } )
+                        vict['net'] = vict.sim - vict.mkt
+                        if vict.net.mean() > 0.0:
+                            victory = True
+                            log.info('Congratulations, Warren Buffet!  You won the trading game.')
+                    #print("Model saved in file: {}".format(save_path))
+
+                
+                    
+                episode += 1
+                observation,Returns = env.reset()
+                reward_sum = 0
+                day = 0
+                
+        return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})

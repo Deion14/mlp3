@@ -1,3 +1,4 @@
+
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
@@ -27,7 +28,9 @@ def _prices2returns(prices):
   R = np.append( R[0].values, 0)
   return R
 
-class QuandlEnvSrc(object):
+
+
+class QuandlEnvSrcTest(object):
   ''' 
   Quandl-based implementation of a TradingEnv's data source.
   
@@ -44,62 +47,13 @@ class QuandlEnvSrc(object):
     self.name = name
     self.auth = auth
     self.days = days+1
-    log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
-
-    '''
-    df = quandl.get_table('WIKI/PRICES',ticker=ticker, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
-    log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
-    
-
-    df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
-    #print(df.shape)
-    # we calculate returns and percentiles, then kill nans
-    df = df[['ticker','adj_close','volume']] 
-    df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
-    df['Return'] = (df.adj_close-df.adj_close.shift())/df.adj_close.shift()
-    pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    #df['ClosePctl'] = df.adj_close.expanding(self.MinPercentileDays).apply(pctrank)
-    #df['VolumePctl'] = df.volume.expanding(self.MinPercentileDays).apply(pctrank)
-    
-    #I separated the dataframes by ticker, had a for loop that does the return calculation, then stacked the stocks vertically and got rid of the NaN values in a really absic way. It works, but we will want to do something more sophistocated later
-    A = df[df['ticker'] == 'A']
-    A = A[['adj_close','volume','Return']]
-
-    AAPL = df[df['ticker'] == 'AAPL']
-    AAPL = AAPL[['adj_close','volume','Return']]
-    #pdb.set_trace()
-    stocks = [A, AAPL]
-    for df in stocks:
-        #df.dropna(axis=0,inplace=True)
-        R = df.Return
-        if scale:
-          mean_values = df.mean(axis=0)
-          std_values = df.std(axis=0)
-          df = (df - np.array(mean_values))/ np.array(std_values)
-        df['Return'] = R # we don't want our returns scaled
-        df.fillna(0)
-        
-        
-    AAPL=AAPL.set_index(np.arange(0,len(A)))
-    #myList = ["stock"+str(i) for i in range(10)]
-    A=A.join(AAPL, lsuffix='Stock1', rsuffix='Stock2')
-    #pdb.set_trace()
-    A=A.iloc[1:,:]
-    
-    df = np.dstack((stocks[0], stocks[1])) 
-    df[0,2,0] = 0
-    df[0,2,1] = 0
-    
-    # rename and standardize
-    df=A
-    colNames=list(df)
-    #pdb.set_trace()    '''
-    
+    log.info('getting data for %s from quandl...',QuandlEnvSrcTest.Name)
+   
     
     Stocks=['A','AAPL','MSFT']
     self.NumberOfStocks=len(Stocks)
     
-    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) 
+    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2016-12-25', 'lte': '2017-12-29' }, paginate=False) 
     
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
     
@@ -143,13 +97,15 @@ class QuandlEnvSrc(object):
     self.data = df
     self.step = 0
 
+
   def reset(self):
-    # we want contiguous data
+    # automatically starts at first 
     
-    self.idx = np.random.randint( low = 0, high=len(self.data.index)-self.days )
+    self.idx = 0  #np.random.randint( low = 0, high=len(self.data.index)-self.days )
     self.step = 0
 
   def _step(self):    
+
     obs = self.data.iloc[self.idx].as_matrix()
     self.idx += 1
     self.step += 1
@@ -166,6 +122,7 @@ class QuandlEnvSrc(object):
                     #############################                 #########################################
 
                     #############################                 #########################################
+
 
 
 
@@ -298,38 +255,15 @@ class TradingSim(object) :
 
 
 
-
-class TradingEnv(gym.Env):
+class TestingEnv(gym.Env):
   """This gym implements a simple trading environment for reinforcement learning.
 
-  The gym provides daily observations based on real market data pulled
-  from Quandl on, by default, the SPY etf. An episode is defined as 252
-  contiguous days sampled from the overall dataset. Each day is one
-  'step' within the gym and for each step, the algo has a choice:
-
-  SHORT (0)
-  FLAT (1)
-  LONG (2)
-
-  If you trade, you will be charged, by default, 10 BPS of the size of
-  your trade. Thus, going from short to long costs twice as much as
-  going from short to/from flat. Not trading also has a default cost of
-  1 BPS per step. Nobody said it would be easy!
-
-  At the beginning of your episode, you are allocated 1 unit of
-  cash. This is your starting Net Asset Value (NAV). If your NAV drops
-  to 0, your episode is over and you lose. If your NAV hits 2.0, then
-  you win.
-
-  The trading env will track a buy-and-hold strategy which will act as
-  the benchmark for the game.
-
-  """
+   """
   metadata = {'render.modes': ['human']}
 
   def __init__(self):
     self.days = 252
-    self.src = QuandlEnvSrc(days=self.days)
+    self.src = QuandlEnvSrcTest(days=self.days)
     self.sim = TradingSim(steps=self.days, trading_cost_bps=1e-3,
                           time_cost_bps=1e-4,NumberOfStocks=self.src.NumberOfStocks)
 
@@ -405,10 +339,3 @@ class TradingEnv(gym.Env):
           alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
             
     return alldf
-
-
-
-                    #############################                 #########################################
-
-                    #############################                 #########################################
-
