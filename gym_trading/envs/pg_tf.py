@@ -22,7 +22,7 @@ from matplotlib import interactive
 interactive(True)
 import gym_trading
 
-import policy_gradient
+#import policy_gradient
 
 # so you can test different architectures
 class HiddenLayer:
@@ -70,16 +70,19 @@ class PolicyModel:
         policy_bias = tf.Variable(tf.constant(0.1, shape=[3]))
 
     # get final hidden layer
-    p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
+    with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
+        p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
     p_val = tf.transpose(p_val, [1, 0, 2])
     last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
     
     Z = tf.matmul(last, policy_weight) + policy_bias
     
-    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=5.0, dtype=tf.float32)
+    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=50, dtype=tf.float32)
     Z = Z+noise
     
+    sign = tf.sign(Z)
     Z = tf.nn.softmax(Z)
+    Z = Z*sign
 
     self.predict_op = Z
 
@@ -125,7 +128,7 @@ class ValueModel:
 
     #initilize RNN
     num_hidden = 24
-    value_cell = tf.nn.rnn_cell.BasicLSTMCell(num_hidden)
+    value_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
 
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_value')
@@ -137,7 +140,8 @@ class ValueModel:
         value_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
     
     # get final hidden layer
-    v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
+    with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
+        v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
     v_val = tf.transpose(v_val, [1, 0, 2])
     last = tf.gather(v_val, int(v_val.get_shape()[0]) - 1)
     
@@ -171,19 +175,17 @@ def play_one_td(env, pmodel, vmodel, gamma):
   totalreward = 0
   iters = 0
   
-  observations = []
-  rewards = []
   
   while not done:
     
     action = pmodel.sample_action(observation)
+    #action = np.array([[0,0,1]])
+    #action = np.random.uniform(-1, 1, size=(1,3))
+    
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
     
     #print(action)
-        
-    observations = np.array(observations)
-    rewards = np.array(rewards)
     
     totalreward = sort
 
@@ -193,7 +195,7 @@ def play_one_td(env, pmodel, vmodel, gamma):
     advantage = G - vmodel.predict(prev_observation)
     pmodel.partial_fit(prev_observation, action, advantage)
     vmodel.partial_fit(prev_observation, G)
-
+    
     iters += 1
 
   return totalreward, iters
@@ -221,8 +223,9 @@ def main():
     monitor_dir = './' + filename + '_' + str(datetime.now())
     env = wrappers.Monitor(env, monitor_dir)
 
-  N = 500
+  N = 200
   totalrewards = np.empty(N)
+  avarage_rewards = np.empty(N)
   costs = np.empty(N)
   for n in range(N):
     totalreward, num_steps = play_one_td(env, pmodel, vmodel, gamma)
@@ -230,10 +233,12 @@ def main():
     totalrewards[n] = totalreward
     if n % 1 == 0:
       print("episode:", n, "total reward: %.1f" % totalreward, "num steps: %d" % num_steps, "avg reward (last 100): %.1f" % totalrewards[max(0, n-100):(n+1)].mean())
+      avarage_rewards[n] = totalrewards[max(0, n-100):(n+1)].mean()
 
   print("avg reward for last 100 episodes:", totalrewards[-100:].mean())
 
-  plt.plot(totalrewards)
+  np.savetxt('all_in_one.txt', avarage_rewards)
+  plt.plot(avarage_rewards)
   plt.title("Rewards")
   plt.show()
 
@@ -242,4 +247,5 @@ def main():
 
 
 if __name__ == '__main__':
+  
   main()
