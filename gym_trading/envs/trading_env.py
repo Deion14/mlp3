@@ -186,7 +186,7 @@ class TradingSim(object) :
     self.trades           = np.zeros(self.steps)
     self.mkt_retrns       = np.zeros((self.steps,1))
     self.total_returns    = 0
-    self.negative_returns = np.zeros(0)
+    self.negative_returns = [0]
     
   def reset(self):
     self.step = 0
@@ -199,9 +199,12 @@ class TradingSim(object) :
     self.trades.fill(0)
     self.mkt_retrns.fill(0)
     self.total_returns    = 0
+    self.negative_returns = [0]
+
+
     
   def _step(self, action, retrn ):
-      """ Given an action and return for prior period, calculates costs, navs,
+    """ Given an action and return for prior period, calculates costs, navs,
         etc and returns the reward and a  summary of the day's activity. """
 
     #bod_posn = 0.0 if self.step == 0 else self.posns[self.step-1]

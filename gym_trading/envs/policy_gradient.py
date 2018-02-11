@@ -32,8 +32,9 @@ class PolicyGradient(object) :
                  obs_dim,             # observation shape
                  num_actions,         # number of possible actions
                  NumOfLayers,
-                 actFunc,
                  LR,
+                 architecture,
+                 actFunc,
                  regulizer=None,
                  regulizerScale=0.01,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
@@ -43,6 +44,7 @@ class PolicyGradient(object) :
                  
                  ):
         self.actFunc=actFunc
+        self.obs_dim=obs_dim
         self.Reg= regulizer
         self.RegScale= regulizerScale    
         self._sess = sess
@@ -53,6 +55,7 @@ class PolicyGradient(object) :
         self._num_stocks = num_actions
         self.NumofLayers=NumOfLayers
         hidden_neurons = obs_dim * neurons_per_dim
+        self.architecture = architecture
         
         '''
         
@@ -98,7 +101,7 @@ class PolicyGradient(object) :
         self._tf_x = tf.placeholder(dtype=tf.float32, shape=[None, obs_dim],name="tf_x")
         self._tf_y = tf.placeholder(dtype=tf.float32, shape=[None, num_actions],name="tf_y")
         self._tf_epr = tf.placeholder(dtype=tf.float32, shape=[None,1], name="tf_epr")
-        self.X = tf.placeholder(tf.float32, shape=(None, 9, 1), name='X_for_policy')
+        self.X = tf.placeholder(tf.float32, shape=(None, obs_dim, 1), name='X_for_policy')
         self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
         self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
         
@@ -128,8 +131,6 @@ class PolicyGradient(object) :
 #        pdb.set_trace()
         self.Reg= None
         self._tf_aprob = self.tf_policy_forward(self.X,OutputDimensions)
-        print(self._tf_aprob)
-        print(self._tf_y)
         loss = tf.nn.l2_loss(self._tf_y - self._tf_aprob) # this gradient encourages the actions taken
         self._saver = tf.train.Saver()
         
@@ -223,10 +224,27 @@ class PolicyGradient(object) :
             
             outputDim=OutputDimensions[i] #OutputDimensions[i]
            
-            if i ==0:
+            if i ==0 and self.architecture == "LSTM":
                  h, _  = tf.nn.dynamic_rnn(policy_cell, x, dtype=tf.float32)
                  h = tf.nn.relu(h)
                 
+            if i ==0 and self.architecture == "FFNN":
+                 h=tf.contrib.layers.fully_connected(x,
+                                                    outputDim,
+                                                    activation_fn=actFunc,
+                                                    normalizer_fn=None,
+                                                    normalizer_params=None,
+                                                    weights_initializer=init,
+                                                    weights_regularizer=self.Reg,
+                                                    biases_initializer=tf.zeros_initializer(),
+                                                    biases_regularizer=None,
+                                                    reuse=None,
+                                                    variables_collections=None,
+                                                    outputs_collections=None,
+                                                    trainable=True,
+                                                    scope=None)
+                    
+                    
             elif i>0 and i < max(range(self.NumofLayers)):
                                              
                  h=tf.contrib.layers.fully_connected(h,
@@ -270,7 +288,6 @@ class PolicyGradient(object) :
 
         p = tf.multiply(sign,tf.nn.softmax(absLogP))
         
-        print(p)
         return p,logp
     
     
@@ -329,7 +346,7 @@ class PolicyGradient(object) :
 
             
             x=observation
-            feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (-1, 9, 1))}
+            feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (-1, self.obs_dim, 1))}
            
             
             aprob,logp = self._sess.run(self._tf_aprob,feed)
@@ -359,8 +376,8 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                print(action)
-                epx = np.reshape(np.vstack(xs), (-1, 9, 1))
+                epx = np.vstack(xs)
+                epX = np.reshape(np.vstack(xs), (-1, self.obs_dim, 1))
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
 
@@ -372,7 +389,7 @@ class PolicyGradient(object) :
 
                 #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
                 
-                feed = {self.X: epx, self._tf_epr: epr, self._tf_y: epy}
+                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self._tf_x: epx}
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
                 if episode % log_freq == 0:
