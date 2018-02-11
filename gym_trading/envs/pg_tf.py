@@ -49,29 +49,37 @@ class HiddenLayer:
 
 # approximates pi(a | s)
 class PolicyModel:
-  def __init__(self, D):
-
+  def __init__(self, D, A):
+      
+      
+    self.D = D
+    self.A = A
     
     #initilize RNN
     num_hidden = 24
-    policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+    policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
     
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, 6, 1), name='X_for_policy')
-    self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
-    self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
+    self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_policy')
+    self.actions = tf.placeholder(tf.float32, shape=(None,3), name='actions')
+    self.advantages = tf.placeholder(tf.float32, shape=(None,3), name='advantages')
     
     with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 3]))
     with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
-        policy_bias = tf.Variable(tf.constant(0.1, shape=[2]))
+        policy_bias = tf.Variable(tf.constant(0.1, shape=[3]))
 
     # get final hidden layer
     p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
     p_val = tf.transpose(p_val, [1, 0, 2])
     last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
     
-    Z = tf.nn.softmax(tf.matmul(last, policy_weight) + policy_bias)
+    Z = tf.matmul(last, policy_weight) + policy_bias
+    
+    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=5.0, dtype=tf.float32)
+    Z = Z+noise
+    
+    Z = tf.nn.softmax(Z)
 
     self.predict_op = Z
 
@@ -83,10 +91,10 @@ class PolicyModel:
 
   def partial_fit(self, X, actions, advantages):
     
-    X = np.reshape(X, (-1, 6, 1))
+    X = np.reshape(X, (-1, self.D, 1))
     
-    actions = np.reshape(actions, (-1, 2))
-    advantages = np.reshape(advantages, (-1, 2))
+    actions = np.reshape(actions, (-1, 3))
+    advantages = np.reshape(advantages, (-1, 3))
     self.session.run(
       self.train_op,
       feed_dict={
@@ -102,29 +110,31 @@ class PolicyModel:
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
   def sample_action(self, X):
-    X = np.reshape(X, (-1, 6, 1))  
+    X = np.reshape(X, (-1, self.D, 1))  
     p = self.predict(X)
     return p
 
 
 # approximates V(s)
 class ValueModel:
-  def __init__(self, D):
-
+  def __init__(self, D, A):
+    
+    self.D = D
+    self.A = A
     self.costs = []
 
     #initilize RNN
     num_hidden = 24
-    value_cell = tf.nn.rnn_cell.BasicLSTMCell(num_hidden,state_is_tuple=True)
+    value_cell = tf.nn.rnn_cell.BasicLSTMCell(num_hidden)
 
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, 6, 1), name='X_for_value')
-    self.Y = tf.placeholder(tf.float32, shape=(None,2), name='Y')
+    self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_value')
+    self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
     
     with tf.variable_scope('value_weight', reuse=tf.AUTO_REUSE):
-        value_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+        value_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
     with tf.variable_scope('value_biases', reuse=tf.AUTO_REUSE):        
-        value_bias = tf.Variable(tf.constant(0.1, shape=[2]))
+        value_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
     
     # get final hidden layer
     v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
@@ -143,15 +153,15 @@ class ValueModel:
 
   def partial_fit(self, X, Y):
 
-    X = np.reshape(X, (-1, 6, 1))
-    Y = np.reshape(Y, (-1, 2))
+    X = np.reshape(X, (-1, self.D, 1))
+    Y = np.reshape(Y, (-1, self.A))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
     self.costs.append(cost)
 
   def predict(self, X):
 
-    X = np.reshape(X, (-1, 6, 1))
+    X = np.reshape(X, (-1, self.D, 1))
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
@@ -169,6 +179,8 @@ def play_one_td(env, pmodel, vmodel, gamma):
     action = pmodel.sample_action(observation)
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
+    
+    #print(action)
         
     observations = np.array(observations)
     rewards = np.array(rewards)
@@ -193,9 +205,10 @@ def main():
   
   ft = FeatureTransformer(env, n_components=100)
   #D = ft.dimensions
-  D = 6
-  pmodel = PolicyModel(D)
-  vmodel = ValueModel(D)
+  D = 9
+  A = 3
+  pmodel = PolicyModel(D, A)
+  vmodel = ValueModel(D, A)
   init = tf.global_variables_initializer()
   session = tf.InteractiveSession()
   session.run(init)
@@ -230,4 +243,3 @@ def main():
 
 if __name__ == '__main__':
   main()
-
