@@ -96,7 +96,7 @@ class QuandlEnvSrc(object):
     #pdb.set_trace()    '''
     
     
-    Stocks=['A','AAPL','MSFT']
+    Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T', 'SNAP', 'INTC', 'WFC', 'VALE', 'PFE', 'SWN', 'NVDA', 'WFT', 'CMCSA', 'FCX', 'SIRI', 'KMI', 'XOM', 'PBR', 'RAD', 'JPM', 'VZ', 'NOK', 'C', 'ABEV', 'RIG', 'NWL', 'ORCL', 'QCOM', 'VIPS', 'KO', 'AMAT', 'TEVA', 'AKS', 'ESV', 'FEYE', 'ABX', 'SLB', 'GM', 'CTL', 'SBUX', 'GRPN', 'CX', 'DAL', 'CBL', 'PG', 'RF', 'S', 'ATVI', 'MRK', 'JD', 'MGM', 'HAL', 'MRO', 'V', 'EXPE', 'HBI', 'FOXA', 'CVS', 'HPE', 'KEY', 'NBR', 'ECA', 'EBAY', 'FDC', 'MS', 'GG', 'AIG', 'JNJ', 'CZR', 'AUY', 'DDR', 'SAN', 'PYPL', 'CLF', 'WMT', 'ITUB', 'AMZN', 'MDLZ', 'GILD', 'NKE', 'BRX', 'PBR', 'A', 'KGC', 'HPQ', 'X', 'DWDP', 'ON', 'VER', 'RRC', 'CY', 'TSLA', 'SCHW', 'PTEN']
     self.NumberOfStocks=len(Stocks)
     
     df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) 
@@ -113,10 +113,11 @@ class QuandlEnvSrc(object):
     #df['Return5Day'] = (df.adj_close-df.adj_close.shift(periods=5))/df.adj_close.shift(periods=5)
     #df['Return10Day'] = (df.adj_close-df.adj_close.shift(periods=10))/df.adj_close.shift(periods=10)
     pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    names=["Stock"+str(i) for i in range(1,3)]
+    names=["Stock"+str(i) for i in range(1,100)]
     
     for i ,j in enumerate(Stocks):
         if i==0:
+            pdb.set_trace()  
             DF=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
         elif i==1:
             stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
@@ -128,13 +129,13 @@ class QuandlEnvSrc(object):
             stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
             stock1=  stock1.set_index(np.arange(0,len(stock1)))
             DF=DF.join(stock1, rsuffix=names[i-2])
-        
+      
     DF=DF.iloc[1:] # remove 1st 10 
     colNames=list(DF)
     #removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
     
     colNames = [i for j, i in enumerate(colNames) if j not in range(self.Dimension-1,self.NumberOfStocks*self.Dimension,self.Dimension)]
-
+    
     DF[colNames] = DF[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
     
     df=DF
