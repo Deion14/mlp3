@@ -1,6 +1,2 @@
-model_checkpoint_path: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-401"
+model_checkpoint_path: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-1"
 all_model_checkpoint_paths: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-1"
-all_model_checkpoint_paths: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-101"
-all_model_checkpoint_paths: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-201"
-all_model_checkpoint_paths: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-301"
-all_model_checkpoint_paths: "/Users/andrewplaate/mlp3/SavedModels/model.ckpt-401"
