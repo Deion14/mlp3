@@ -234,9 +234,9 @@ class PolicyGradient(object) :
                                                     outputs_collections=None,
                                                     trainable=True,
                                                     scope=None)                                                 
-            
+        # last Layer to output    
                                              
-            h=tf.contrib.layers.fully_connected(h,
+        h=tf.contrib.layers.fully_connected(h,
                                                     outputDim,
                                                     activation_fn=None,
                                                     normalizer_fn=None,
@@ -250,7 +250,7 @@ class PolicyGradient(object) :
                                                     outputs_collections=None,
                                                     trainable=True,
                                                     scope=None)       
-            logp=h
+        logp=h
     
         
                 #################        #################        #################
@@ -269,7 +269,7 @@ class PolicyGradient(object) :
     def GaussianNoise(inputs, returns):
         
         stdd=np.std(returns,axis=0)
-        noise=np.random.normal(0,stdd**4)
+        noise=np.random.normal(0,stdd*2)
         t1=  (inputs+noise)
         if abs(t1).sum()==0:
             print("Yup some zero variance shit here")
