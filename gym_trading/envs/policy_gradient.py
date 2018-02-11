@@ -114,7 +114,7 @@ class PolicyGradient(object) :
         # Different Regularization Rules            
         if self.Reg=="l2":
                 self.Reg = tf.contrib.layers.l2_regularizer(scale=self.RegScale)
-        elif  self.regul=="l1":
+        elif  self.Reg=="l1":
                 self.Reg= tf.contrib.layers.l1_regularizer(scale=self.RegScale)
         elif  self.Reg=="None":
                 self.Reg= None
@@ -125,7 +125,7 @@ class PolicyGradient(object) :
         self.Reg= None
         self._tf_aprob = self.tf_policy_forward(self._tf_x,OutputDimensions)
         loss = tf.nn.l2_loss(self._tf_y - self._tf_aprob) # this gradient encourages the actions taken
-
+        self._saver = tf.train.Saver()
         
 
         # Different Learning Rules
@@ -163,13 +163,16 @@ class PolicyGradient(object) :
 
     def tf_policy_forward(self, x,OutputDimensions): #x ~ [1,D]
         
+        #################        #################        #################
         '''
         h = tf.matmul(x, self._tf_model['W1'])
         h = tf.nn.relu(h)
         logp = tf.matmul(h, self._tf_model['W2']) 
         '''
         #################        #################        #################
+        #################        #################        #################
         '''
+        
         for i in range(0,self.NumofLayers):
 
             if i ==0:
@@ -183,7 +186,7 @@ class PolicyGradient(object) :
                  h = tf.matmul(h, self._tf_model[self.NameW[i]])
                  logp=h
         '''
-        
+        #################        #################        #################
         if self.actFunc=="softmax":
                 actFunc=tf.nn.softmax
         elif  self.actFunc=="relu":
@@ -231,9 +234,9 @@ class PolicyGradient(object) :
                                                     outputs_collections=None,
                                                     trainable=True,
                                                     scope=None)                                                 
-            else:
+            
                                              
-                 h=tf.contrib.layers.fully_connected(h,
+            h=tf.contrib.layers.fully_connected(h,
                                                     outputDim,
                                                     activation_fn=None,
                                                     normalizer_fn=None,
@@ -247,7 +250,7 @@ class PolicyGradient(object) :
                                                     outputs_collections=None,
                                                     trainable=True,
                                                     scope=None)       
-                 logp=h
+            logp=h
     
         
                 #################        #################        #################
@@ -266,7 +269,7 @@ class PolicyGradient(object) :
     def GaussianNoise(inputs, returns):
         
         stdd=np.std(returns,axis=0)
-        noise=np.random.normal(0,stdd)
+        noise=np.random.normal(0,stdd**4)
         t1=  (inputs+noise)
         if abs(t1).sum()==0:
             print("Yup some zero variance shit here")
@@ -279,11 +282,13 @@ class PolicyGradient(object) :
     
     def train_model(self, env, episodes=100, 
                     load_model = False,  # load model from checkpoint if available:?
-                    model_dir = '/tmp/pgmodel/', log_freq=10 ) :
+                    model_dir = "/Users/andrewplaate/mlp3/SavedModels/", log_freq=10 ) :
+                   
 
         # initialize variables and load model
         init_op = tf.global_variables_initializer()
         self._sess.run(init_op)
+        
         if load_model:
             ckpt = tf.train.get_checkpoint_state(model_dir)
             print(tf.train.latest_checkpoint(model_dir))
@@ -321,6 +326,7 @@ class PolicyGradient(object) :
            
             
             aprob,logp = self._sess.run(self._tf_aprob,feed)
+            
             #aprob = aprob[0,:] # we live in a batched world :/
 
             aprob=PolicyGradient.GaussianNoise(aprob,Returns)
@@ -346,7 +352,7 @@ class PolicyGradient(object) :
             day += 1
             if done:
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                #print(action)
+                print(action)
                 epx = np.vstack(xs)
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
@@ -365,8 +371,8 @@ class PolicyGradient(object) :
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                  #  save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
-                   #                              global_step=episode+1)
+                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
+                                                 global_step=episode+1)
                     print(sort)
                     if episode > 100:
                         vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
