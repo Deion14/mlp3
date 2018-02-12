@@ -46,60 +46,21 @@ class QuandlEnvSrc(object):
     self.days = days+1
     log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
 
-    '''
-    df = quandl.get_table('WIKI/PRICES',ticker=ticker, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) if self.auth=='' else quandl.get(self.name, authtoken=self.auth)
-    log.info('got data for %s from quandl...',QuandlEnvSrc.Name)
-    
 
-    df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
-    #print(df.shape)
-    # we calculate returns and percentiles, then kill nans
-    df = df[['ticker','adj_close','volume']] 
-    df.volume.replace(0,1,inplace=True) # days shouldn't have zero volume..
-    df['Return'] = (df.adj_close-df.adj_close.shift())/df.adj_close.shift()
-    pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    #df['ClosePctl'] = df.adj_close.expanding(self.MinPercentileDays).apply(pctrank)
-    #df['VolumePctl'] = df.volume.expanding(self.MinPercentileDays).apply(pctrank)
-    
-    #I separated the dataframes by ticker, had a for loop that does the return calculation, then stacked the stocks vertically and got rid of the NaN values in a really absic way. It works, but we will want to do something more sophistocated later
-    A = df[df['ticker'] == 'A']
-    A = A[['adj_close','volume','Return']]
-
-    AAPL = df[df['ticker'] == 'AAPL']
-    AAPL = AAPL[['adj_close','volume','Return']]
-    #pdb.set_trace()
-    stocks = [A, AAPL]
-    for df in stocks:
-        #df.dropna(axis=0,inplace=True)
-        R = df.Return
-        if scale:
-          mean_values = df.mean(axis=0)
-          std_values = df.std(axis=0)
-          df = (df - np.array(mean_values))/ np.array(std_values)
-        df['Return'] = R # we don't want our returns scaled
-        df.fillna(0)
-        
-        
-    AAPL=AAPL.set_index(np.arange(0,len(A)))
-    #myList = ["stock"+str(i) for i in range(10)]
-    A=A.join(AAPL, lsuffix='Stock1', rsuffix='Stock2')
-    #pdb.set_trace()
-    A=A.iloc[1:,:]
-    
-    df = np.dstack((stocks[0], stocks[1])) 
-    df[0,2,0] = 0
-    df[0,2,1] = 0
-    
-    # rename and standardize
-    df=A
-    colNames=list(df)
-    #pdb.set_trace()    '''
-    
     
     Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T', 'SNAP', 'INTC', 'WFC', 'VALE', 'PFE', 'SWN', 'NVDA', 'WFT', 'CMCSA', 'FCX', 'SIRI', 'KMI', 'XOM', 'PBR', 'RAD', 'JPM', 'VZ', 'NOK', 'C', 'ABEV', 'RIG', 'NWL', 'ORCL', 'QCOM', 'VIPS', 'KO', 'AMAT', 'TEVA', 'AKS', 'ESV', 'FEYE', 'ABX', 'SLB', 'GM', 'CTL', 'SBUX', 'GRPN', 'CX', 'DAL', 'CBL', 'PG', 'RF', 'S', 'ATVI', 'MRK', 'JD', 'MGM', 'HAL', 'MRO', 'V', 'EXPE', 'HBI', 'FOXA', 'CVS', 'HPE', 'KEY', 'NBR', 'ECA', 'EBAY', 'FDC', 'MS', 'GG', 'AIG', 'JNJ', 'CZR', 'AUY', 'DDR', 'SAN', 'PYPL', 'CLF', 'WMT', 'ITUB', 'AMZN', 'MDLZ', 'GILD', 'NKE', 'BRX', 'PBR', 'A', 'KGC', 'HPQ', 'X', 'DWDP', 'ON', 'VER', 'RRC', 'CY', 'TSLA', 'SCHW', 'PTEN']
-    self.NumberOfStocks=len(Stocks)
+    #if 10 stocks in stead of 100
+    #Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T']
     
-    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=False) 
+    #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=True ) 
+    
+    
+    PATH_CSV="/Users/andrewplaate/mlp3/100Stocks.csv"
+    df=pd.read_csv(PATH_CSV, header=0, sep=',')
+    
+    
+    self.NumberOfStocks=len(Stocks)
+
     
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
     
@@ -113,12 +74,13 @@ class QuandlEnvSrc(object):
     #df['Return5Day'] = (df.adj_close-df.adj_close.shift(periods=5))/df.adj_close.shift(periods=5)
     #df['Return10Day'] = (df.adj_close-df.adj_close.shift(periods=10))/df.adj_close.shift(periods=10)
     pctrank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    names=["Stock"+str(i) for i in range(1,100)]
+    names=["Stock"+str(i) for i in range(1,len(Stocks)+1)]
     
     for i ,j in enumerate(Stocks):
         if i==0:
-            pdb.set_trace()  
-            DF=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
+            stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
+            stock1=  stock1.set_index(np.arange(0,len(stock1)))
+            DF=stock1
         elif i==1:
             stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
             stock1=  stock1.set_index(np.arange(0,len(stock1)))
@@ -128,10 +90,11 @@ class QuandlEnvSrc(object):
 
             stock1=df[df['ticker'] == Stocks[i]].drop("ticker", axis=1 )
             stock1=  stock1.set_index(np.arange(0,len(stock1)))
-            DF=DF.join(stock1, rsuffix=names[i-2])
+            DF=DF.join(stock1, rsuffix=names[i])
       
     DF=DF.iloc[1:] # remove 1st 10 
     colNames=list(DF)
+
     #removeRetCols = ["ReturnStock"+str(i) for i in range(1,3)]
     
     colNames = [i for j, i in enumerate(colNames) if j not in range(self.Dimension-1,self.NumberOfStocks*self.Dimension,self.Dimension)]
