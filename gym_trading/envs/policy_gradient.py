@@ -15,6 +15,7 @@ import logging
 import os.path
 import pandas as pd
 import gym_trading
+import pickle as pkl
 
 import trading_env as te
 
@@ -35,6 +36,7 @@ class PolicyGradient(object) :
                  LR,
                  architecture,
                  actFunc,
+                 avgfilename,          #name for pickle file of average values
                  regulizer=None,
                  regulizerScale=0.01,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
@@ -56,6 +58,8 @@ class PolicyGradient(object) :
         self.NumofLayers=NumOfLayers
         hidden_neurons = obs_dim * neurons_per_dim
         self.architecture = architecture
+        self.last100avg = []
+        self.filename = avgfilename
         
         '''
         
@@ -153,9 +157,19 @@ class PolicyGradient(object) :
         
         tf_grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables(), 
                                                grad_loss=self._tf_discounted_epr)
-        #tf_grads = [(tf.clip_by_value(grad, -1.2, 1.2), var) for grad, var in tf_grads]
-
+        def ClipIfNotNone(grad):
+            if grad is None:
+                return grad
+            return tf.clip_by_value(grad, -1.2, 1.2)
+        tf_grads_clipped = [(ClipIfNotNone(grad), var) for grad, var in tf_grads]
+        #tf_grads_clipped = [(tf.clip_by_value(tf_grads, -1.2, 1.2), var) for grad, var in tf_grads]
+        self.tf_grads = tf_grads
+        self.tf_grads_clipped = tf_grads_clipped
+#tro/ppo
         self._train_op = optimizer.apply_gradients(tf_grads)
+    
+    def get_grads_and_clipping(self):
+        return self.tf_grads, self.tf_grads_clipped
     
     def tf_discount_rewards(self, tf_r): #tf_r ~ [game_steps,1]
         discount_f = lambda a, v: a*self._gamma + v;
@@ -356,7 +370,6 @@ class PolicyGradient(object) :
             aprob=PolicyGradient.GaussianNoise(aprob,Returns)
             
             action=aprob
-            #print(aprob)
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
@@ -364,7 +377,6 @@ class PolicyGradient(object) :
             # step the environment and get new measurements
 
             observation, reward, done, sort, info, Returns = env.step(action)
-
             #print observation, reward, done, info
             reward_sum += reward
 
@@ -380,7 +392,9 @@ class PolicyGradient(object) :
                 epX = np.reshape(np.vstack(xs), (-1, self.obs_dim, 1))
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
-
+                
+                self.last100avg = np.append(self.last100avg, np.mean(epr[-150:]))
+                
                 xs,rs,ys = [],[],[] # reset game history
                 #df = env.sim.to_df()
                 #pdb.set_trace()
@@ -395,9 +409,9 @@ class PolicyGradient(object) :
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
-                                                 global_step=episode+1)
-                    print(sort)
+                    #save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
+                    #                             global_step=episode+1)
+                    print(self.last100avg)
                     if episode > 100:
                         vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
                                                'mkt': mktrors[episode-100:episode] } )
@@ -413,7 +427,7 @@ class PolicyGradient(object) :
                 observation,Returns = env.reset()
                 reward_sum = 0
                 day = 0
-                
+        pkl.dump(self.last100avg, open(self.filename, 'wb'))        
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
     
@@ -470,16 +484,16 @@ class PolicyGradient(object) :
             #aprob=PolicyGradient.GaussianNoise(aprob,Returns)
             
             action=aprob
-            #print(aprob)
+            
+            print(aprob)
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
-            
+            pdb.set_trace()
             # step the environment and get new measurements
 
             observation, reward, done, sort, info, Returns = env.step(action)
 
-            #print observation, reward, done, info
             reward_sum += reward
             print(episode,reward)
 
@@ -504,7 +518,6 @@ class PolicyGradient(object) :
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
                     save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
                                                  global_step=episode+1)
-
                     if episode > 100:
                         vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
                                                'mkt': mktrors[episode-100:episode] } )
