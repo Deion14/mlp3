@@ -60,13 +60,13 @@ class PolicyModel:
     
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_policy')
-    self.actions = tf.placeholder(tf.float32, shape=(None,3), name='actions')
-    self.advantages = tf.placeholder(tf.float32, shape=(None,3), name='advantages')
+    self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
+    self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
     
     with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 3]))
+        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
     with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
-        policy_bias = tf.Variable(tf.constant(0.1, shape=[3]))
+        policy_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
 
     # get final hidden layer
     with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
@@ -95,8 +95,8 @@ class PolicyModel:
     
     X = np.reshape(X, (-1, self.D, 1))
     
-    actions = np.reshape(actions, (-1, 3))
-    advantages = np.reshape(advantages, (-1, 3))
+    actions = np.reshape(actions, (-1, self.A))
+    advantages = np.reshape(advantages, (-1, self.A))
     self.session.run(
       self.train_op,
       feed_dict={
@@ -179,7 +179,7 @@ def play_one_td(env, pmodel, vmodel, gamma):
   while not done:
     
     action = pmodel.sample_action(observation)
-    print(action)
+    #print(action)
     #action = np.array([[0,0,1]])
     #action = np.random.uniform(-1, 1, size=(1,3))
     
@@ -220,8 +220,7 @@ def main_training():
   env = env.unwrapped
   
   #D = ft.dimensions
-  D = 9
-  A = 3
+  D,A = 30, 10
   pmodel = PolicyModel(D, A)
   vmodel = ValueModel(D, A)
   
@@ -272,7 +271,7 @@ def main_testing():
   
   tf.reset_default_graph()
   
-  D, A = 9,3
+  D, A = 30,10
   pmodel = PolicyModel(D, A)
   vmodel = ValueModel(D, A)  
   
