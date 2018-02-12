@@ -14,7 +14,6 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from gym import wrappers
 from datetime import datetime
-from q_learning import plot_running_avg, FeatureTransformer, plot_cost_to_go
 
 import pandas as pd
 import matplotlib as mpl
@@ -77,7 +76,7 @@ class PolicyModel:
     
     Z = tf.matmul(last, policy_weight) + policy_bias
     
-    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=1, dtype=tf.float32)
+    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=.1, dtype=tf.float32)
     Z = Z+noise
     
     sign = tf.sign(Z)
@@ -170,6 +169,7 @@ class ValueModel:
 
 
 def play_one_td(env, pmodel, vmodel, gamma):
+
   observation,_ = env.reset()
   done = False
   totalreward = 0
@@ -179,6 +179,7 @@ def play_one_td(env, pmodel, vmodel, gamma):
   while not done:
     
     action = pmodel.sample_action(observation)
+    print(action)
     #action = np.array([[0,0,1]])
     #action = np.random.uniform(-1, 1, size=(1,3))
     
@@ -200,20 +201,34 @@ def play_one_td(env, pmodel, vmodel, gamma):
 
   return totalreward, iters
 
+def make_testing_predictions(env, pmodel):
+    
+  observation,_ = env.reset()
+    
+  action = pmodel.sample_action(observation)
+  #action = np.array([[0,0,1]])
+  #action = np.random.uniform(-1, 1, size=(1,3))
+    
+  observation, reward, done, sort , info, _ = env.step(action)
+    #print(action)
+  totalreward = sort
+  return totalreward    
 
-def main():
+def main_training():
+    
   env = gym.make('trading-v0')
   env = env.unwrapped
   
-  ft = FeatureTransformer(env, n_components=100)
   #D = ft.dimensions
   D = 9
   A = 3
   pmodel = PolicyModel(D, A)
   vmodel = ValueModel(D, A)
+  
   init = tf.global_variables_initializer()
   session = tf.InteractiveSession()
-  session.run(init)
+  session.run(init)    
+  
   pmodel.set_session(session)
   vmodel.set_session(session)
   gamma = 0.95
@@ -223,10 +238,9 @@ def main():
     monitor_dir = './' + filename + '_' + str(datetime.now())
     env = wrappers.Monitor(env, monitor_dir)
 
-  N = 2000
+  N = 100
   totalrewards = np.empty(N)
   avarage_rewards = np.empty(N)
-  costs = np.empty(N)
   for n in range(N):
     totalreward, num_steps = play_one_td(env, pmodel, vmodel, gamma)
         
@@ -238,15 +252,46 @@ def main():
   print("avg reward for last 100 episodes:", totalrewards[-100:].mean())
 
   np.savetxt('all_in_one.txt', avarage_rewards)
+  saver = tf.train.Saver()
+  saved_path = saver.save(session, "saved_models/model.ckpt")
+  
+  print(saved_path)
+  
   plt.plot(avarage_rewards)
   plt.plot(totalrewards)
   plt.title("Rewards")
   plt.show()
 
   #plot_running_avg(totalrewards)
-  #plot_cost_to_go(env, vmodel)
-
+  #plot_cost_to_go(env, vmodel) 
+    
+def main_testing():
+    
+  env_testing = gym.make('testing-v0')
+  env_testing = env_testing.unwrapped
+  
+  tf.reset_default_graph()
+  
+  D, A = 9,3
+  pmodel = PolicyModel(D, A)
+  vmodel = ValueModel(D, A)  
+  
+  saver = tf.train.Saver()
+  session = tf.InteractiveSession()
+  
+  saver.restore(session, "saved_models/model.ckpt")
+  
+  pmodel.set_session(session)
+  vmodel.set_session(session)
+  
+  totalrewards = []
+  for i in range(50):
+      totalreward = make_testing_predictions(env_testing, pmodel)
+      totalrewards.append(totalreward)
+  
+  print(totalrewards)    
 
 if __name__ == '__main__':
-  
-  main()
+    
+  main_training()
+  #main_testing()

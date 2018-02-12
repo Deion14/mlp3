@@ -53,7 +53,7 @@ class QuandlEnvSrcTest(object):
     Stocks=['A','AAPL','MSFT']
     self.NumberOfStocks=len(Stocks)
     
-    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2016-12-25', 'lte': '2017-12-29' }, paginate=False) 
+    df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2016-9-20', 'lte': '2017-12-29' }, paginate=False) 
     
     df = df[ ~np.isnan(df.volume)][['ticker','volume', 'adj_close']]
     
