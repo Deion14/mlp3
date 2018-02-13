@@ -55,7 +55,9 @@ class QuandlEnvSrc(object):
     #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=True ) 
     
     
+
     PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
+
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     

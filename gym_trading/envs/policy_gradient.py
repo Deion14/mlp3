@@ -212,7 +212,8 @@ class PolicyGradient(object) :
         '''
         #################        #################        #################
         num_hidden = 24
-        policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+        #policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+        policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
         with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
             policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
 
@@ -224,8 +225,7 @@ class PolicyGradient(object) :
         
         
         
-        
-          
+      
         if self.actFunc=="sigmoid":
                 actFunc=tf.nn.sigmoid
         elif  self.actFunc=="relu":
@@ -345,8 +345,8 @@ class PolicyGradient(object) :
                 print("Model restored from ",ckpt.model_checkpoint_path)
             else:
                 print('No checkpoint found at: ',model_dir)
-        if not os.path.exists(model_dir):
-            os.makedirs(model_dir)
+        #if not os.path.exists(model_dir):
+        #    os.makedirs(model_dir)
 
         episode = 0
         observation,Returns = env.reset()
