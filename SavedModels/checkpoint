@@ -1,0 +1,2 @@
+model_checkpoint_path: "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/SavedModels/RNN_GD_sig_l2model.ckpt-5"
+all_model_checkpoint_paths: "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/SavedModels/RNN_GD_sig_l2model.ckpt-5"
