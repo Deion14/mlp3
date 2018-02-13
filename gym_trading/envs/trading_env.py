@@ -55,7 +55,9 @@ class QuandlEnvSrc(object):
     #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=True ) 
     
     
-    PATH_CSV="/Users/andrewplaate/mlp3/10Stocks.csv"
+
+    PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
+
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
@@ -233,7 +235,7 @@ class TradingSim(object) :
     #  self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
     
     #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
-    info = { 'reward': reward,  'costs':self.costs[self.step] }
+    info = { 'reward': reward,  'costs':self.costs[self.step] ,'nominal_reward':nominal_reward}
 
 
     self.step += 1      
