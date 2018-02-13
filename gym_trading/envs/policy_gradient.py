@@ -14,6 +14,7 @@ import pdb
 import logging
 import os.path
 import pandas as pd
+import time
 import gym_trading
 import pickle as pkl
 
@@ -37,6 +38,7 @@ class PolicyGradient(object) :
                  architecture,
                  actFunc,
                  avgfilename,          #name for pickle file of average values
+                 Modelfilename,        #name for model to save   
                  regulizer=None,
                  regulizerScale=0.01,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
@@ -60,6 +62,7 @@ class PolicyGradient(object) :
         self.architecture = architecture
         self.last100avg = []
         self.filename = avgfilename
+        self.filenameModel= Modelfilename
         
         '''
         
@@ -222,15 +225,21 @@ class PolicyGradient(object) :
         
         
         
-        if self.actFunc=="softmax":
-                actFunc=tf.nn.softmax
+          
+        if self.actFunc=="sigmoid":
+                actFunc=tf.nn.sigmoid
         elif  self.actFunc=="relu":
                 actFunc=tf.nn.relu
+        elif self.actFunc=="lrelu":
+                actFunc= tf.nn.leaky_relu
         elif self.actFunc=="elu":
-                actFunc= tf.nn.elu
+                actFunc= tf.nn.elu   
+        elif self.actFunc=="selu":
+                actFunc= tf.nn.selu                   
         else:
             assert("wrong acttivation function")
-                   
+                    
+                    
             
         init=tf.contrib.layers.xavier_initializer(uniform=False, seed=1, dtype=tf.float32)
 
@@ -355,6 +364,12 @@ class PolicyGradient(object) :
         mktrors = np.zeros(episodes)
         alldf = None
         victory = False
+        
+        self.sort = np.array([])
+        self.NomReward = np.array([])
+        
+        self.mean_sort = np.array([])
+        t=time.time()           
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
 
@@ -373,10 +388,12 @@ class PolicyGradient(object) :
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
-            
+            #print(action)
             # step the environment and get new measurements
 
             observation, reward, done, sort, info, Returns = env.step(action)
+            nominal_reward=info["nominal_reward"]
+            #print(nominal_reward)
             #print observation, reward, done, info
             reward_sum += reward
 
@@ -387,14 +404,20 @@ class PolicyGradient(object) :
             rs.append(reward)
             day += 1
             if done:
+                print(time.time()-t)    
+                t=time.time()
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 epx = np.vstack(xs)
                 epX = np.reshape(np.vstack(xs), (-1, self.obs_dim, 1))
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
                 
-                self.last100avg = np.append(self.last100avg, np.mean(epr[-150:]))
+                #self.last100avg = np.append(self.last100avg, np.mean(epr[-150:]))
+                #self.mean_sort = np.append(self.mean_sort, self.sort[-10:].mean())
                 
+                self.NomReward = np.append(self.NomReward, nominal_reward)
+                self.sort = np.append(self.sort, sort)
+               
                 xs,rs,ys = [],[],[] # reset game history
                 #df = env.sim.to_df()
                 #pdb.set_trace()
@@ -409,129 +432,19 @@ class PolicyGradient(object) :
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                    #save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
-                    #                             global_step=episode+1)
-                    print(self.last100avg)
-                    if episode > 100:
-                        vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
-                                               'mkt': mktrors[episode-100:episode] } )
-                        vict['net'] = vict.sim - vict.mkt
-                        if vict.net.mean() > 0.0:
-                            victory = True
-                            log.info('Congratulations, Warren Buffet!  You won the trading game.')
-                    #print("Model saved in file: {}".format(save_path))
-
-                
-                    
-                episode += 1
-                observation,Returns = env.reset()
-                reward_sum = 0
-                day = 0
-        pkl.dump(self.last100avg, open(self.filename, 'wb'))        
-        return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
-    
-    
-    
- 
-    
-    def test_model(self, env, episodes=100, 
-                    load_model = True,  # load model from checkpoint if available:?
-                    model_dir = "/Users/andrewplaate/mlp3/SavedModels/", log_freq=10 ) :
-                   
-
-        # initialize variables and load model
-        init_op = tf.global_variables_initializer()
-        self._sess.run(init_op)
-        
-        if load_model:
-            ckpt = tf.train.get_checkpoint_state(model_dir)
-            print(tf.train.latest_checkpoint(model_dir))
-            if ckpt and ckpt.model_checkpoint_path:
-                savr = tf.train.import_meta_graph(ckpt.model_checkpoint_path+'.meta')
-                out = savr.restore(self._sess, ckpt.model_checkpoint_path)
-                print("Model restored from ",ckpt.model_checkpoint_path)
-            else:
-                print('No checkpoint found at: ',model_dir)
-        if not os.path.exists(model_dir):
-            os.makedirs(model_dir)
-
-        episode = 0
-        observation,Returns = env.reset()
-        
-#        x = observation[0]
-#        Returns = observation[1]
-        
-        
-        xs,rs,ys = [],[],[]    # environment info
-        running_reward = 0    
-        reward_sum = 0
-        # training loop
-        day = 0
-        simrors = np.zeros(episodes)
-        mktrors = np.zeros(episodes)
-        alldf = None
-        victory = False
-        while episode < episodes and not victory:
-            # stochastically sample a policy from the network
-
-            
-            x=observation
-            feed = {self._tf_x: np.reshape(x, (1,-1))}
-           
-            
-            aprob,logp = self._sess.run(self._tf_aprob,feed)
-            
-            #aprob=PolicyGradient.GaussianNoise(aprob,Returns)
-            
-            action=aprob
-            
-            print(aprob)
-            #action = np.random.choice(self._num_actions, p=aprob)
-            #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
-            label=action
-            pdb.set_trace()
-            # step the environment and get new measurements
-
-            observation, reward, done, sort, info, Returns = env.step(action)
-
-            reward_sum += reward
-            print(episode,reward)
-
-            # record game history
-            xs.append(x)
-            ys.append(label)
-            rs.append(reward)
-            day += 1
-            if done:
-               
-                running_reward = running_reward * 0.99 + reward_sum * 0.01
-                epx = np.vstack(xs)
-                epr = np.vstack(rs)
-                epy = np.vstack(ys)
-
-                xs,rs,ys = [],[],[] # reset game history
-                #df = env.sim.to_df()
-                #pdb.set_trace()
-               
-                if episode % log_freq == 0:
-                    log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
-                             sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
+                if episode == episodes-1:
+                       save_path = self._saver.save(self._sess, self.filenameModel+'model.ckpt',
                                                  global_step=episode+1)
-                    if episode > 100:
-                        vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
-                                               'mkt': mktrors[episode-100:episode] } )
-                        vict['net'] = vict.sim - vict.mkt
-                        if vict.net.mean() > 0.0:
-                            victory = True
-                            log.info('Congratulations, Warren Buffet!  You won the trading game.')
-                    #print("Model saved in file: {}".format(save_path))
-
                 
                     
                 episode += 1
                 observation,Returns = env.reset()
                 reward_sum = 0
                 day = 0
-                
+        #pdb.set_trace()        
+        Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        pkl.dump(self.sort, open( self.filename, 'wb'))        
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
+    
+    
+   
