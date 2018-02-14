@@ -39,6 +39,7 @@ class PolicyGradient(object) :
                  actFunc,
                  avgfilename,          #name for pickle file of average values
                  Modelfilename,        #name for model to save   
+                 num_hiddenRNN=24,
                  regulizer=None,
                  regulizerScale=0.01,
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
@@ -54,6 +55,7 @@ class PolicyGradient(object) :
         self._sess = sess
         self.learningRule=LR
         self._gamma = gamma
+        self.num_hiddenRNN=num_hiddenRNN
         self._tf_model = {}
         self._num_actions = num_actions
         self._num_stocks = num_actions
@@ -211,7 +213,7 @@ class PolicyGradient(object) :
                  logp=h
         '''
         #################        #################        #################
-        num_hidden = 24
+        num_hidden = self.num_hiddenRNN
         #policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
         policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
         with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
