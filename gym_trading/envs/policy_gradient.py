@@ -110,7 +110,7 @@ class PolicyGradient(object) :
         self._tf_x = tf.placeholder(dtype=tf.float32, shape=[None, obs_dim],name="tf_x")
         self._tf_y = tf.placeholder(dtype=tf.float32, shape=[None, num_actions],name="tf_y")
         self._tf_epr = tf.placeholder(dtype=tf.float32, shape=[None,1], name="tf_epr")
-        self.X = tf.placeholder(tf.float32, shape=(None, obs_dim, 1), name='X_for_policy')
+        self.X = tf.placeholder(tf.float32, shape=(1, 252, 30), name='X_for_policy')
         self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
         self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
         
@@ -254,7 +254,7 @@ class PolicyGradient(object) :
                  h = tf.nn.relu(h)
                 
             if i ==0 and self.architecture == "FFNN":
-                 h=tf.contrib.layers.fully_connected(x,
+                 h=tf.contrib.layers.fully_connected(h,
                                                     outputDim,
                                                     activation_fn=actFunc,
                                                     normalizer_fn=None,
@@ -270,8 +270,7 @@ class PolicyGradient(object) :
                                                     scope=None)
                     
                     
-            elif i>0 and i < max(range(self.NumofLayers)):
-                                             
+            elif i>0 and i < max(range(self.NumofLayers)) and self.architecture == "FFNN":
                  h=tf.contrib.layers.fully_connected(h,
                                                     outputDim,
                                                     activation_fn=actFunc,
@@ -287,7 +286,7 @@ class PolicyGradient(object) :
                                                     trainable=True,
                                                     scope=None)                                                 
         # last Layer to output    
-                                             
+       
         h=tf.contrib.layers.fully_connected(tf.contrib.layers.flatten(h),
                                                     outputDim,
                                                     activation_fn=None,
@@ -313,7 +312,7 @@ class PolicyGradient(object) :
 
         p = tf.multiply(sign,tf.nn.softmax(absLogP))
         
-        return p,logp
+        return h,logp
     
     
     def GaussianNoise(inputs, returns):
@@ -377,15 +376,17 @@ class PolicyGradient(object) :
 
             
             x=observation
-            feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (-1, self.obs_dim, 1))}
+            #feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (10, 252, 3))}
+            feed = {self.X: np.reshape(x, (-1, 252, 30))}
            
-            
+            #print(np.reshape(x, (-1, self.obs_dim, 1)))
+            #print(np.reshape(x, (-1, self.obs_dim, 1)).shape)
+            #print(x.shape)
             aprob,logp = self._sess.run(self._tf_aprob,feed)
             
             #aprob = aprob[0,:] # we live in a batched world :/
 
             aprob=PolicyGradient.GaussianNoise(aprob,Returns)
-            
             action=aprob
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
@@ -401,7 +402,7 @@ class PolicyGradient(object) :
 
 
             # record game history
-            xs.append(x)
+            #xs.append(x)
             ys.append(label)
             rs.append(reward)
             day += 1
@@ -409,8 +410,11 @@ class PolicyGradient(object) :
                 print(time.time()-t)    
                 t=time.time()
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                epx = np.vstack(xs)
-                epX = np.reshape(np.vstack(xs), (-1, self.obs_dim, 1))
+                #epx = np.vstack(xs)
+                epx = observation
+                #epX = np.reshape(np.vstack(xs), (10, -1, 3))
+                epX = np.reshape(observation, (-1,252,30))
+
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
                 
@@ -445,7 +449,7 @@ class PolicyGradient(object) :
                 day = 0
         #pdb.set_trace()        
         Sort_Returns=  np.vstack([self.sort, self.NomReward])
-        pkl.dump(Sort_Returns, open( self.filename, 'wb'))        
+        #pkl.dump(Sort_Returns, open( self.filename, 'wb'))        
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
    
