@@ -28,31 +28,32 @@ obs_dim=num_actions*Variables
 NumOfLayers=2
 architecture = "LSTM" # right now, valid inputs are LSTM and FFNN
 LR="GD"
-actFunc="relu"
+actFunc="lrelu"
 regulizer="l2"
 regulizerScale=0.0001
 #avgfilename="/home/s1793158/mlp3/FILE_Name.p"
 
-actFuncs=["relu","elu","lrelu","selu","sigmoid"]
-name=["RNN_GD_relu_l2","RNN_GD_elu_l2","RNN_GD_lrelu_l2","RNN_GD_selu_l2","RNN_GD_sig_l2"]
+LRs=["RMSProp","RMSProp","Adam","Adam","Mom","Mom","GD","GD"]
+rates[1e-3,1e-4,1e-3,1e-4,1e-3,1e-4,1e-3,1e-4]
+name=["RNN_RMSProp_lrelu_l2_e3","RNN_RMSProp_lrelu_l2_e4","RNN_Adam_lrelu_l2_e3","RNN_Adam_lrelu_l2_e4","RNN_Mom_lrelu_l2_e3","RNN_Mom_lrelu_l2_e4","RNN_GD_lrelu_l2_e3","RNN_GD_lrelu_l2_e4",]
    # from tensorflow.python.framework import ops
     #ops.reset.default_graph()
 
-for i in range(5):
+for i in range(8):
     tf.reset_default_graph()
     sess = tf.InteractiveSession()
     
-    avgfilename="/home/s1793158/mlp3/Saving/"+name[i]+".p"
+    avgfilename="/home/s1793158/mlp3/gym_trading/envs/GPUresults2.16/"+name[i]+".p"
     Modelfilename="/home/s1793158/mlp3/mlp3/SavedModels/"+name[i]
     
     
     pg = policy_gradient.PolicyGradient(sess, obs_dim=obs_dim, 
                                         num_actions=num_actions,
                                         NumOfLayers=NumOfLayers, 
-                                        LR=LR,
+                                        LR=LRs[i],
                                         architecture=architecture,
-                                        actFunc=actFuncs[i],
-                                        learning_rate=1e-4,
+                                        actFunc=actFunc,
+                                        learning_rate=rates[i],
                                         regulizer =regulizer,
                                         regulizerScale=regulizerScale,
                                         avgfilename=avgfilename,
