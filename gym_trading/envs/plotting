@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Feb 12 20:59:16 2018
+
+@author: s1749290
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+adam = np.loadtxt('saved_models/adam_0.1/nominal_rewards.txt')
+rms = np.loadtxt('saved_models/rms_0.1/nominal_rewards.txt')
+
+plt.hist(adam, alpha=0.5, bins=100)
+plt.hist(rms, alpha=0.5, bins=100)
+
+plt.show()
+
+adam = np.loadtxt('saved_models/adam_0.1/sorts.txt')
+rms = np.loadtxt('saved_models/rms_0.1/sorts.txt')
+
+plt.hist(adam, alpha=0.5)
+plt.hist(rms, alpha=0.5)
+plt.show()
