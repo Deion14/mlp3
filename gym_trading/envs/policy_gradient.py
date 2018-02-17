@@ -449,7 +449,8 @@ class PolicyGradient(object) :
                 day = 0
         #pdb.set_trace()        
         Sort_Returns=  np.vstack([self.sort, self.NomReward])
-        pkl.dump(Sort_Returns, open( self.filename, 'wb'))        
+        pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
+        
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
    
