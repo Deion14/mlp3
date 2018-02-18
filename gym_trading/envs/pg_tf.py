@@ -20,6 +20,7 @@ import matplotlib as mpl
 from matplotlib import interactive
 interactive(True)
 import gym_trading
+import time
 
 #import policy_gradient
 
@@ -55,7 +56,7 @@ class PolicyModel:
     self.A = A
     
     #initilize RNN
-    num_hidden = 24
+    num_hidden = 72
     policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
     
     # inputs and targets
@@ -76,7 +77,7 @@ class PolicyModel:
     
     Z = tf.matmul(last, policy_weight) + policy_bias
     
-    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=.1, dtype=tf.float32)
+    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=1, dtype=tf.float32)
     Z = Z+noise
     
     sign = tf.sign(Z)
@@ -86,7 +87,7 @@ class PolicyModel:
     self.predict_op = Z
 
     cost = -tf.reduce_sum(self.advantages * self.actions + Z)
-    self.train_op = tf.train.AdamOptimizer(1e-3).minimize(cost)
+    self.train_op = tf.train.AdamOptimizer(1e-1).minimize(cost)
 
   def set_session(self, session):
     self.session = session
@@ -126,7 +127,7 @@ class ValueModel:
     self.costs = []
 
     #initilize RNN
-    num_hidden = 24
+    num_hidden = 72
     value_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
 
     # inputs and targets
@@ -172,7 +173,6 @@ def play_one_td(env, pmodel, vmodel, gamma):
 
   observation,_ = env.reset()
   done = False
-  totalreward = 0
   iters = 0
   
   
@@ -185,10 +185,6 @@ def play_one_td(env, pmodel, vmodel, gamma):
     
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
-    
-    #print(action)
-    
-    totalreward = sort
 
     # update the models
     V_next = vmodel.predict(observation)
@@ -198,8 +194,8 @@ def play_one_td(env, pmodel, vmodel, gamma):
     vmodel.partial_fit(prev_observation, G)
     
     iters += 1
-
-  return totalreward, iters
+  #return np.array(total_rewards[-150:]).mean(), iters
+  return sort, info['nominal_reward'], iters
 
 def make_testing_predictions(env, pmodel):
     
@@ -210,7 +206,7 @@ def make_testing_predictions(env, pmodel):
   #action = np.random.uniform(-1, 1, size=(1,3))
     
   observation, reward, done, sort , info, _ = env.step(action)
-    #print(action)
+  #print(action)
   totalreward = sort
   return totalreward    
 
@@ -237,27 +233,28 @@ def main_training():
     monitor_dir = './' + filename + '_' + str(datetime.now())
     env = wrappers.Monitor(env, monitor_dir)
 
-  N = 100
-  totalrewards = np.empty(N)
-  avarage_rewards = np.empty(N)
+  N = 5000
+  sorts = np.empty(N)
+  nominal_rewards = np.empty(N)
   for n in range(N):
-    totalreward, num_steps = play_one_td(env, pmodel, vmodel, gamma)
-        
-    totalrewards[n] = totalreward
+    sort, nominal_reward, num_steps = play_one_td(env, pmodel, vmodel, gamma)
+    
+    sorts[n] = sort    
+    nominal_rewards[n] = nominal_reward
+    
     if n % 1 == 0:
-      print("episode:", n, "total reward: %.1f" % totalreward, "num steps: %d" % num_steps, "avg reward (last 100): %.1f" % totalrewards[max(0, n-100):(n+1)].mean())
-      avarage_rewards[n] = totalrewards[max(0, n-100):(n+1)].mean()
+      print("episode:", n, "total reward: %.4f" % sort, "num steps: %d" % num_steps, "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean())
 
-  print("avg reward for last 100 episodes:", totalrewards[-100:].mean())
-
-  np.savetxt('all_in_one.txt', avarage_rewards)
+  np.savetxt("saved_models/adam_72/sorts.txt", sorts)
+  np.savetxt("saved_models/adam_72/nominal_rewards.txt", nominal_rewards)
+  
   saver = tf.train.Saver()
-  saved_path = saver.save(session, "saved_models/model.ckpt")
+  saver.save(session, "saved_models/adam_72/model.ckpt")
   
-  print(saved_path)
+  #print(saved_path)
   
-  plt.plot(avarage_rewards)
-  plt.plot(totalrewards)
+  plt.plot(sorts)
+  plt.plot(nominal_rewards)
   plt.title("Rewards")
   plt.show()
 
@@ -291,6 +288,10 @@ def main_testing():
   print(totalrewards)    
 
 if __name__ == '__main__':
-    
+  
+  s_time = time.time()
   main_training()
+  e_time = time.time()
+  
+  print(e_time-s_time)
   #main_testing()

@@ -47,14 +47,17 @@ class QuandlEnvSrc(object):
     log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
 
 
-    #Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T', 'SNAP', 'INTC', 'WFC', 'VALE', 'PFE', 'SWN', 'NVDA', 'WFT', 'CMCSA', 'FCX', 'SIRI', 'KMI', 'XOM', 'PBR', 'RAD', 'JPM', 'VZ', 'NOK', 'C', 'ABEV', 'RIG', 'NWL', 'ORCL', 'QCOM', 'VIPS', 'KO', 'AMAT', 'TEVA', 'AKS', 'ESV', 'FEYE', 'ABX', 'SLB', 'GM', 'CTL', 'SBUX', 'GRPN', 'CX', 'DAL', 'CBL', 'PG', 'RF', 'S', 'ATVI', 'MRK', 'JD', 'MGM', 'HAL', 'MRO', 'V', 'EXPE', 'HBI', 'FOXA', 'CVS', 'HPE', 'KEY', 'NBR', 'ECA', 'EBAY', 'FDC', 'MS', 'GG', 'AIG', 'JNJ', 'CZR', 'AUY', 'DDR', 'SAN', 'PYPL', 'CLF', 'WMT', 'ITUB', 'AMZN', 'MDLZ', 'GILD', 'NKE', 'BRX', 'PBR', 'A', 'KGC', 'HPQ', 'X', 'DWDP', 'ON', 'VER', 'RRC', 'CY', 'TSLA', 'SCHW', 'PTEN']
+    
+    Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T', 'SNAP', 'INTC', 'WFC', 'VALE', 'PFE', 'SWN', 'NVDA', 'WFT', 'CMCSA', 'FCX', 'SIRI', 'KMI', 'XOM', 'PBR', 'RAD', 'JPM', 'VZ', 'NOK', 'C', 'ABEV', 'RIG', 'NWL', 'ORCL', 'QCOM', 'VIPS', 'KO', 'AMAT', 'TEVA', 'AKS', 'ESV', 'FEYE', 'ABX', 'SLB', 'GM', 'CTL', 'SBUX', 'GRPN', 'CX', 'DAL', 'CBL', 'PG', 'RF', 'S', 'ATVI', 'MRK', 'JD', 'MGM', 'HAL', 'MRO', 'V', 'EXPE', 'HBI', 'FOXA', 'CVS', 'HPE', 'KEY', 'NBR', 'ECA', 'EBAY', 'FDC', 'MS', 'GG', 'AIG', 'JNJ', 'CZR', 'AUY', 'DDR', 'SAN', 'PYPL', 'CLF', 'WMT', 'ITUB', 'AMZN', 'MDLZ', 'GILD', 'NKE', 'BRX', 'PBR', 'A', 'KGC', 'HPQ', 'X', 'DWDP', 'ON', 'VER', 'RRC', 'CY', 'TSLA', 'SCHW', 'PTEN']
     #if 10 stocks in stead of 100
     Stocks=['GE', 'AMD', 'F', 'AAPL', 'AIG', 'CHK', 'MU', 'MSFT', 'CSCO', 'T']
     
     #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=True ) 
     
     
+
     PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/10Stocks.csv"
+
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
@@ -205,9 +208,9 @@ class TradingSim(object) :
     
     if nominal_reward < 0:
         self.negative_returns = np.append(self.negative_returns, nominal_reward)
-        stdev_neg_returns = np.std(self.negative_returns)
+        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
     else:
-        stdev_neg_returns = np.std(self.negative_returns)
+        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
     if stdev_neg_returns == 0:
         newsort = self.total_returns / .1
     else:
@@ -232,7 +235,7 @@ class TradingSim(object) :
     #  self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
     
     #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
-    info = { 'reward': reward,  'costs':self.costs[self.step] }
+    info = { 'reward': reward,  'costs':self.costs[self.step] ,'nominal_reward':nominal_reward}
 
 
     self.step += 1      
