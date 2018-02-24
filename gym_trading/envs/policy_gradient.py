@@ -17,7 +17,7 @@ import pandas as pd
 import time
 import gym_trading
 import pickle as pkl
-
+import os
 import trading_env as te
 
 logging.basicConfig()
@@ -65,6 +65,7 @@ class PolicyGradient(object) :
         self.last100avg = []
         self.filename = avgfilename
         self.filenameModel= Modelfilename
+#        tf.set_random_seed(1234)
         
         '''
         
@@ -141,7 +142,7 @@ class PolicyGradient(object) :
         self.Reg= None
         self._tf_aprob = self.tf_policy_forward(self.X,OutputDimensions)
         loss = tf.nn.l2_loss(self._tf_y - self._tf_aprob) # this gradient encourages the actions taken
-        self._saver = tf.train.Saver()
+        self._saver = tf.train.Saver(save_relative_paths=True)
         
 
         # Different Learning Rules
@@ -213,18 +214,7 @@ class PolicyGradient(object) :
                  logp=h
         '''
         #################        #################        #################
-        num_hidden = self.num_hiddenRNN
-        #policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
-        policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
-        with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-            policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
-
-    
-        with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-            policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
-        with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
-            policy_bias = tf.Variable(tf.constant(0.1, shape=[2]))
-        
+          
         
         
       
@@ -241,9 +231,20 @@ class PolicyGradient(object) :
         else:
             assert("wrong acttivation function")
                     
-                    
+        num_hidden = self.num_hiddenRNN
+        #policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
+        policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=actFunc)
+        with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
+            policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+
+    
+        with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
+            policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
+        with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
+            policy_bias = tf.Variable(tf.constant(0.1, shape=[2]))
+              
             
-        init=tf.contrib.layers.xavier_initializer(uniform=False, seed=1, dtype=tf.float32)
+        init=tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
 
         for i in range(0,self.NumofLayers):
             
@@ -251,7 +252,7 @@ class PolicyGradient(object) :
            
             if i ==0 and self.architecture == "LSTM":
                  h, _  = tf.nn.dynamic_rnn(policy_cell, x, dtype=tf.float32)
-                 h = tf.nn.relu(h)
+                
                 
             if i ==0 and self.architecture == "FFNN":
                  h=tf.contrib.layers.fully_connected(h,
@@ -377,23 +378,22 @@ class PolicyGradient(object) :
             
             x=observation
             #feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (10, 252, 3))}
+
             feed = {self.X: np.reshape(x, (-1, 252, 30))}
            
             #print(np.reshape(x, (-1, self.obs_dim, 1)))
             #print(np.reshape(x, (-1, self.obs_dim, 1)).shape)
             #print(x.shape)
             aprob,logp = self._sess.run(self._tf_aprob,feed)
-            
-            #aprob = aprob[0,:] # we live in a batched world :/
 
+           
             aprob=PolicyGradient.GaussianNoise(aprob,Returns)
             action=aprob
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
-            #print(action)
-            # step the environment and get new measurements
-
+     
+           # step the environment and get new measurements
             observation, reward, done, sort, info, Returns = env.step(action)
             nominal_reward=info["nominal_reward"]
             #print(nominal_reward)
@@ -439,7 +439,9 @@ class PolicyGradient(object) :
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
                 if episode == episodes-1:
-                       save_path = self._saver.save(self._sess, self.filenameModel+'model.ckpt',
+                    if not os.path.exists(self.filenameModel):
+                       os.makedirs(self.filenameModel)
+                    save_path = self._saver.save(self._sess, self.filenameModel+'/model.ckpt',
                                                  global_step=episode+1)
                 
                     
@@ -449,6 +451,7 @@ class PolicyGradient(object) :
                 day = 0
         #pdb.set_trace()        
         Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        
         pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
         
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
@@ -456,7 +459,7 @@ class PolicyGradient(object) :
    
     def test_model(self, env, episodes=100, 
                     load_model = True,  # load model from checkpoint if available:?
-                    model_dir = "/Users/andrewplaate/mlp3/SavedModels/", log_freq=10 ) :
+                    model_dir = "", log_freq=10 ) :
                    
 
         # initialize variables and load model
@@ -472,15 +475,13 @@ class PolicyGradient(object) :
                 print("Model restored from ",ckpt.model_checkpoint_path)
             else:
                 print('No checkpoint found at: ',model_dir)
-        #if not os.path.exists(model_dir):
-        #    os.makedirs(model_dir)
-
+        else:
+                print('No model Loaded :-(')
+        
+        
+        
         episode = 0
         observation,Returns = env.reset()
-        
-#        x = observation[0]
-#        Returns = observation[1]
-        
         
         xs,rs,ys = [],[],[]    # environment info
         running_reward = 0    
@@ -491,68 +492,68 @@ class PolicyGradient(object) :
         mktrors = np.zeros(episodes)
         alldf = None
         victory = False
+        
+        self.sort = np.array([])
+        self.NomReward = np.array([])
+        
+        self.mean_sort = np.array([])
+        t=time.time()           
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
 
             
             x=observation
-            feed = {self._tf_x: np.reshape(x, (1,-1))}
-           
-            
+            #feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (10, 252, 3))}
+
+            feed = {self.X: np.reshape(x, (-1, 252, 30))}
+          
             aprob,logp = self._sess.run(self._tf_aprob,feed)
-            
-            #aprob=PolicyGradient.GaussianNoise(aprob,Returns)
-            
             action=aprob
-            
-            print(aprob)
-            #action = np.random.choice(self._num_actions, p=aprob)
-            #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
             label=action
-            pdb.set_trace()
-            # step the environment and get new measurements
 
             observation, reward, done, sort, info, Returns = env.step(action)
-
+            nominal_reward=info["nominal_reward"]
+            #print(nominal_reward)
+            #print observation, reward, done, info
             reward_sum += reward
-            print(episode,reward)
+
 
             # record game history
-            xs.append(x)
+            #xs.append(x)
             ys.append(label)
             rs.append(reward)
             day += 1
             if done:
-               
+                print(time.time()-t)    
+                t=time.time()
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
-                epx = np.vstack(xs)
+                #epx = np.vstack(xs)
+                epx = observation
+                #epX = np.reshape(np.vstack(xs), (10, -1, 3))
+                epX = np.reshape(observation, (-1,252,30))
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
-
-                xs,rs,ys = [],[],[] # reset game history
-                #df = env.sim.to_df()
-                #pdb.set_trace()
+                
+                  
+                self.NomReward = np.append(self.NomReward, nominal_reward)
+                self.sort = np.append(self.sort, sort)
                
+                xs,rs,ys = [],[],[] # reset game history
+                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self._tf_x: epx}
+                _ = self._sess.run(self._train_op,feed) # parameter update
+
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
-                    save_path = self._saver.save(self._sess, model_dir+'model.ckpt',
-                                                 global_step=episode+1)
-                    if episode > 100:
-                        vict = pd.DataFrame( { 'sim': simrors[episode-100:episode],
-                                               'mkt': mktrors[episode-100:episode] } )
-                        vict['net'] = vict.sim - vict.mkt
-                        if vict.net.mean() > 0.0:
-                            victory = True
-                            log.info('Congratulations, Warren Buffet!  You won the trading game.')
-                    #print("Model saved in file: {}".format(save_path))
-
-                
-                    
+                               
                 episode += 1
                 observation,Returns = env.reset()
                 reward_sum = 0
                 day = 0
-                
-        return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})    
+        #pdb.set_trace()        
+        Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        
+        pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
+        
+        return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
    
