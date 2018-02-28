@@ -54,13 +54,14 @@ class PolicyModel:
       
     self.D = D
     self.A = A
+    self.T = 252    
     
     #initilize RNN
     num_hidden = 72
     policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
     
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_policy')
+    self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
     
@@ -123,6 +124,7 @@ class ValueModel:
     
     self.D = D
     self.A = A
+    self.T = 252
     self.costs = []
 
     #initilize RNN
@@ -130,7 +132,7 @@ class ValueModel:
     value_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
 
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_value')
+    self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
     
     value_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
@@ -193,19 +195,7 @@ def play_one_td(env, pmodel, vmodel, gamma):
     iters += 1
   #return np.array(total_rewards[-150:]).mean(), iters
   return sort, info['nominal_reward'], iters
-
-def make_testing_predictions(env, pmodel):
-    
-  observation,_ = env.reset()
-    
-  action = pmodel.sample_action(observation)
-  #action = np.array([[0,0,1]])
-  #action = np.random.uniform(-1, 1, size=(1,3))
-    
-  observation, reward, done, sort , info, _ = env.step(action)
-  #print(action)
-  totalreward = sort
-  return totalreward    
+  
 
 def main_training():
     
@@ -258,6 +248,19 @@ def main_training():
   #plot_running_avg(totalrewards)
   #plot_cost_to_go(env, vmodel) 
     
+def make_testing_predictions(env, pmodel):
+    
+  observation,_ = env.reset()
+    
+  action = pmodel.sample_action(observation)
+  #action = np.array([[0,0,1]])
+  #action = np.random.uniform(-1, 1, size=(1,3))
+    
+  observation, reward, done, sort , info, _ = env.step(action)
+  #print(action)
+  totalreward = sort
+  return totalreward    
+  
 def main_testing():
     
   env_testing = gym.make('testing-v0')
