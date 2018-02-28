@@ -57,7 +57,7 @@ class PolicyModel:
     self.T = 252    
     
     #initilize RNN
-    num_hidden = 72
+    num_hidden = 12
     policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
     
     # inputs and targets
@@ -94,7 +94,7 @@ class PolicyModel:
 
   def partial_fit(self, X, actions, advantages):
     
-    X = np.reshape(X, (-1, self.D, 1))
+    X = np.reshape(X, (-1, self.T, self.D))
     
     actions = np.reshape(actions, (-1, self.A))
     advantages = np.reshape(advantages, (-1, self.A))
@@ -113,7 +113,7 @@ class PolicyModel:
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
   def sample_action(self, X):
-    X = np.reshape(X, (-1, self.D, 1))  
+    X = np.reshape(X, (-1, self.T, self.D))  
     p = self.predict(X)
     return p
 
@@ -128,7 +128,7 @@ class ValueModel:
     self.costs = []
 
     #initilize RNN
-    num_hidden = 72
+    num_hidden = 12
     value_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
 
     # inputs and targets
@@ -156,7 +156,7 @@ class ValueModel:
 
   def partial_fit(self, X, Y):
 
-    X = np.reshape(X, (-1, self.D, 1))
+    X = np.reshape(X, (-1, self.T, self.D))
     Y = np.reshape(Y, (-1, self.A))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
@@ -164,7 +164,7 @@ class ValueModel:
 
   def predict(self, X):
 
-    X = np.reshape(X, (-1, self.D, 1))
+    X = np.reshape(X, (-1, self.T, self.D))
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
