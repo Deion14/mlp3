@@ -64,10 +64,9 @@ class PolicyModel:
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
     
-    with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-        policy_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
-    with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
-        policy_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
+
+    policy_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
+    policy_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
 
     # get final hidden layer
     with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
@@ -134,10 +133,8 @@ class ValueModel:
     self.X = tf.placeholder(tf.float32, shape=(None, self.D, 1), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
     
-    with tf.variable_scope('value_weight', reuse=tf.AUTO_REUSE):
-        value_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
-    with tf.variable_scope('value_biases', reuse=tf.AUTO_REUSE):        
-        value_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
+    value_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
+    value_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
     
     # get final hidden layer
     with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
