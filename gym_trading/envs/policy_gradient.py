@@ -34,6 +34,7 @@ class PolicyGradient(object) :
                  obs_dim,             # observation shape
                  num_actions,         # number of possible actions
                  NumOfLayers,
+                 Num_Of_variables,
                  LR,
                  architecture,
                  actFunc,
@@ -45,7 +46,11 @@ class PolicyGradient(object) :
                  neurons_per_dim=32,  # hidden layer will have obs_dim * neurons_per_dim neurons
                  learning_rate=1e-2,  # learning rate
                  gamma = 0.9,         # reward discounting 
-                 decay = 0.9          # gradient decay rate
+                 decay = 0.9,          # gradient decay rate
+                 DropoutMemoryStates=None,
+                 DropoutVariational_recurrent=False,
+                 state_keep_prob=1,
+                 output_keep_prob=1
                  
                  ):
         self.actFunc=actFunc
@@ -59,12 +64,17 @@ class PolicyGradient(object) :
         self._tf_model = {}
         self._num_actions = num_actions
         self._num_stocks = num_actions
-        self.NumofLayers=NumOfLayers
+        self._variables=Num_Of_variables
+        self.NumofLayers=NumOfLayers   # NUM OF HIDDEN LAYERS NOW!!!!!
         hidden_neurons = obs_dim * neurons_per_dim
         self.architecture = architecture
         self.last100avg = []
         self.filename = avgfilename
         self.filenameModel= Modelfilename
+        self.DropoutMemoryStates=DropoutMemoryStates
+        self.DropoutVariational_recurrent=DropoutVariational_recurrent,
+        self.output_keep_prob=output_keep_prob
+        self.state_keep_prob=state_keep_prob
 #        tf.set_random_seed(1234)
         
         '''
@@ -138,10 +148,11 @@ class PolicyGradient(object) :
         else:
             assert("wrong acttivation function")       
             
-
+        
         self._tf_aprob = self.tf_policy_forward(self.X,OutputDimensions)
        
         loss = tf.nn.l2_loss(self._tf_y - self._tf_aprob) # this gradient encourages the actions taken
+       
         self._saver = tf.train.Saver(save_relative_paths=True)
         
         # Different Learning Rules
@@ -204,56 +215,63 @@ class PolicyGradient(object) :
         else:
             assert("wrong acttivation function")
                     
-        num_hidden = self.num_hiddenRNN
-        #policy_cell = tf.nn.rnn_cell.LSTMCell(num_hidden,state_is_tuple=True)
-        #policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=actFunc)
-        
-        
-        #with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-        #    policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
-
-    
-        #with tf.variable_scope('policy_weights', reuse=tf.AUTO_REUSE):
-        #    policy_weight = tf.Variable(tf.truncated_normal([num_hidden, 2]))
-        #with tf.variable_scope('policy_biases', reuse=tf.AUTO_REUSE):
-        #    policy_bias = tf.Variable(tf.constant(0.1, shape=[2]))
-              
-            
         init=tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
+                  
+        def dropout_state_filter_visitors(state): 
+            ''' Dropout of memory cells Not literature based on tensorflow code'''
+            
+            if isinstance(state, tf.contrib.rnn.LSTMStateTuple): # Never perform dropout on the c state.
+                return tf.contrib.rnn.LSTMStateTuple(c=True, h=True) 
+            elif isinstance(state, tf.TensorArray): 
+                return False 
+            return True
+
         
         
-        #if cell_type == 'LSTM':
-        #    cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self.NumofLayers, state_is_tuple=True)
-        #else:
-        #    cell = tf.nn.rnn_cell.MultiRNNCell([cell] * self.NumofLayers)
-        
-        
-        self.keep_prob=1
-        self.lstm_size=20
         if self.architecture != "FFNN":
-            def get_a_cell(lstm_size, keep_prob):
+            def get_a_cell(num_hidden,i):
+                    ''' Function for GRU, RNN, LSTM'''
 
                     cell_type=self.architecture
 
                     if cell_type == 'GRU':
-                        cell = tf.nn.rnn_cell.GRUCell(state_size)
+                        cell = tf.nn.rnn_cell.GRUCell(num_hidden)
                     elif cell_type == 'LSTM':
-                        cell = tf.nn.rnn_cell.LSTMCell(state_size, state_is_tuple=True)
+                        cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True)
                     elif cell_type == 'RNN':
                         cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=actFunc)
-                    lstm = tf.nn.rnn_cell.BasicRNNCell(lstm_size)
 
-                    #drop = tf.nn.rnn_cell.DropoutWrapper(lstm, output_keep_prob=keep_prob)
-                    return lstm
+#                    pdb.set_trace()
 
+                    drop = tf.nn.rnn_cell.DropoutWrapper(cell, 
+                                                         input_keep_prob=1,
+                                                         output_keep_prob=self.output_keep_prob,
+                                                         state_keep_prob=self.state_keep_prob,
+                                                         variational_recurrent=self.DropoutVariational_recurrent,
+                                                         input_size=self._num_stocks*self._variables if i==0 else tf.TensorShape(num_hidden), 
+                                                         dtype=tf.float32,
+                                                         seed=None,
+                                                         dropout_state_filter_visitor=dropout_state_filter_visitors if self.DropoutMemoryStates==True else None                                                               )
+    
+                    return drop
+
+                
+            ''' Create Stacked Model '''    
             with tf.name_scope('lstm'):
                   cell = tf.nn.rnn_cell.MultiRNNCell(
-                  [get_a_cell(self.lstm_size, self.keep_prob) for _ in range(self.NumofLayers)]
-                )
-
+                  [get_a_cell(self.num_hiddenRNN, i) for i in range(self.NumofLayers)])
+            ''' Make it runable '''
             with tf.variable_scope('RNN', initializer=tf.contrib.layers.xavier_initializer()):
                 h, _ =  tf.nn.dynamic_rnn(cell, x, dtype=tf.float32) 
-        else:
+                
+                  
+        else:  
+             ''' FFN  Has not been tested '''
+            
+                      ####################      ####################      ###################
+                
+            
+           
              for i in range(0,self.NumofLayers):
             
                 outputDim=OutputDimensions[i] #OutputDimensions[i]
@@ -296,51 +314,13 @@ class PolicyGradient(object) :
                                                         scope=None)       
 
         
-        '''  #Old part of the code
-        for i in range(0,self.NumofLayers):
-            
-            outputDim=OutputDimensions[i] #OutputDimensions[i]
-           
-            if i ==0 and self.architecture == "LSTM":
-                 
-                 h, _  = tf.nn.dynamic_rnn(cell, x, dtype=tf.float32)
-                
-            if i ==0 and self.architecture == "FFNN":
-                 h=tf.contrib.layers.fully_connected(h,
-                                                    outputDim,
-                                                    activation_fn=actFunc,
-                                                    normalizer_fn=None,
-                                                    normalizer_params=None,
-                                                    weights_initializer=init,
-                                                    weights_regularizer=self.Reg,
-                                                    biases_initializer=tf.zeros_initializer(),
-                                                    biases_regularizer=None,
-                                                    reuse=None,
-                                                    variables_collections=None,
-                                                    outputs_collections=None,
-                                                    trainable=True,
-                                                    scope=None)
-                    
-                    
-            elif i>0 and i < max(range(self.NumofLayers)) and self.architecture == "FFNN":
-                 h=tf.contrib.layers.fully_connected(h,
-                                                    outputDim,
-                                                    activation_fn=actFunc,
-                                                    normalizer_fn=None,
-                                                    normalizer_params=None,
-                                                    weights_initializer=init,
-                                                    weights_regularizer=self.Reg,
-                                                    biases_initializer=tf.zeros_initializer(),
-                                                    biases_regularizer=None,
-                                                    reuse=None,
-                                                    variables_collections=None,
-                                                    outputs_collections=None,
-                                                    trainable=True,
-                                                    scope=None)                                                 
-        '''
-        # last Layer to output    
+          ####################      ####################      ####################
+        ''' last Layer to output aka softmax shit    '''
         outputDim=10
-        h1=tf.contrib.layers.fully_connected(tf.contrib.layers.flatten(h),
+
+        aaa=self.num_hiddenRNN*252
+        h0 = tf.reshape(h, [-1,aaa ])
+        h1=tf.contrib.layers.fully_connected(h0,#tf.contrib.layers.flatten(h),
                                                     outputDim,
                                                     activation_fn=None,
                                                     normalizer_fn=None,
@@ -360,7 +340,6 @@ class PolicyGradient(object) :
 
         
         sign=tf.sign(logp)
-        #p=tf.sign(logp)*tf.exp(tf.abs(logp)) / tf.reduce_sum(tf.exp(tf.abs(logp)), axis=-1)
         absLogP=tf.abs(logp)
 
         p = tf.multiply(sign,tf.nn.softmax(absLogP))
@@ -372,6 +351,7 @@ class PolicyGradient(object) :
         
         stdd=np.std(returns,axis=0)
         noise=np.random.normal(0,stdd*2)
+        
         t1=  (inputs+noise)
         if abs(t1).sum()==0:
             output=t1
@@ -399,14 +379,9 @@ class PolicyGradient(object) :
                 print("Model restored from ",ckpt.model_checkpoint_path)
             else:
                 print('No checkpoint found at: ',model_dir)
-        #if not os.path.exists(model_dir):
-        #    os.makedirs(model_dir)
-
+  
         episode = 0
         observation,Returns = env.reset()
-        
-#        x = observation[0]
-#        Returns = observation[1]
         
         
         xs,rs,ys = [],[],[]    # environment info
@@ -429,13 +404,9 @@ class PolicyGradient(object) :
 
             
             x=observation
-            #feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (10, 252, 3))}
-
+  
             feed = {self.X: np.reshape(x, (-1, 252, 30))}
            
-            #print(np.reshape(x, (-1, self.obs_dim, 1)))
-            #print(np.reshape(x, (-1, self.obs_dim, 1)).shape)
-            #print(x.shape)
             aprob = self._sess.run(self._tf_aprob,feed)
             #pdb.set_trace()
            
@@ -448,8 +419,7 @@ class PolicyGradient(object) :
            # step the environment and get new measurements
             observation, reward, done, sort, info, Returns = env.step(action)
             nominal_reward=info["nominal_reward"]
-            #print(nominal_reward)
-            #print observation, reward, done, info
+
             reward_sum += reward
 
 
@@ -469,18 +439,12 @@ class PolicyGradient(object) :
 
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
-                
-                #self.last100avg = np.append(self.last100avg, np.mean(epr[-150:]))
-                #self.mean_sort = np.append(self.mean_sort, self.sort[-10:].mean())
-                
+        
                 self.NomReward = np.append(self.NomReward, nominal_reward)
                 self.sort = np.append(self.sort, sort)
                
                 xs,rs,ys = [],[],[] # reset game history
-                #df = env.sim.to_df()
-                #pdb.set_trace()
-                #simrors[episode]=df.bod_nav.values[-1]-1 # compound returns
-                #mktrors[episode]=df.mkt_nav.values[-1]-1
+  
 
                 #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
                 pdb.set_trace()
@@ -508,7 +472,13 @@ class PolicyGradient(object) :
         
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
-   
+    
+    
+    
+####################################  TEST          ####################################   
+                    ####################################
+
+
     def test_model(self, env, episodes=100, 
                     load_model = True,  # load model from checkpoint if available:?
                     model_dir = "", log_freq=10 ) :
