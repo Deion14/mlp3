@@ -56,8 +56,10 @@ class QuandlEnvSrc(object):
     
     
 
-    PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/10Stocks.csv"
+    #PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
 
+    #GPU 
+    PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/10Stocks.csv"
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
@@ -112,11 +114,11 @@ class QuandlEnvSrc(object):
   def reset(self):
     # we want contiguous data
     
-    self.idx = np.random.randint( low = 0, high=len(self.data.index)-self.days )
+    self.idx = np.random.randint( low = 252, high=len(self.data.index)-self.days )
     self.step = 0
 
   def _step(self):    
-    obs = self.data.iloc[self.idx].as_matrix()
+    obs = self.data.iloc[(self.idx-252):self.idx].as_matrix()
     self.idx += 1
     self.step += 1
     done = self.step >= self.days
@@ -124,7 +126,6 @@ class QuandlEnvSrc(object):
 
     retAllStocks=list(np.arange(self.Dimension-1,self.Dimension*self.NumberOfStocks,self.Dimension ))
     returns=self.data.iloc[:self.idx,retAllStocks] #past returns of stocks
-    
     return obs,done,returns
 
 
@@ -322,9 +323,8 @@ class TradingEnv(gym.Env):
     #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
     observation, done, Returns = self.src._step()
     retAllStocks=list(np.arange(self.src.Dimension-1,self.src.Dimension*self.src.NumberOfStocks,self.src.Dimension ))
-    yret = observation[retAllStocks]
+    yret = observation[-1,retAllStocks]
     
-
     reward, sort, info = self.sim._step( action, yret )
 
     return observation, reward, done, sort, info, Returns
@@ -383,3 +383,5 @@ class TradingEnv(gym.Env):
                     #############################                 #########################################
 
                     #############################                 #########################################
+
+

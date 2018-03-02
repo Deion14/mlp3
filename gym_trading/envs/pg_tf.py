@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from gym import wrappers
 from datetime import datetime
 
-import pandas as pd
 import matplotlib as mpl
 from matplotlib import interactive
 interactive(True)
@@ -85,7 +84,6 @@ class PolicyModel:
     Z = Z*sign
 
     self.predict_op = Z
-
     cost = -tf.reduce_sum(self.advantages * self.actions + Z)
     self.train_op = tf.train.AdamOptimizer(1e-1).minimize(cost)
 
@@ -172,19 +170,14 @@ def play_one_td(env, pmodel, vmodel, gamma):
 
   observation,_ = env.reset()
   done = False
-  iters = 0
-  
   
   while not done:
     
     action = pmodel.sample_action(observation)
-    #print(action)
-    #action = np.array([[0,0,1]])
-    #action = np.random.uniform(-1, 1, size=(1,3))
     
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
-
+  
     # update the models
     V_next = vmodel.predict(observation)
     G = reward + gamma*V_next
@@ -192,9 +185,8 @@ def play_one_td(env, pmodel, vmodel, gamma):
     pmodel.partial_fit(prev_observation, action, advantage)
     vmodel.partial_fit(prev_observation, G)
     
-    iters += 1
   #return np.array(total_rewards[-150:]).mean(), iters
-  return sort, info['nominal_reward'], iters
+  return sort, info['nominal_reward']
   
 
 def main_training():
@@ -224,13 +216,13 @@ def main_training():
   sorts = np.empty(N)
   nominal_rewards = np.empty(N)
   for n in range(N):
-    sort, nominal_reward, num_steps = play_one_td(env, pmodel, vmodel, gamma)
+    sort, nominal_reward = play_one_td(env, pmodel, vmodel, gamma)
     
     sorts[n] = sort    
     nominal_rewards[n] = nominal_reward
     
     if n % 1 == 0:
-      print("episode:", n, "total reward: %.4f" % sort, "num steps: %d" % num_steps, "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean())
+      print("episode:", n, "total reward: %.4f" % sort, "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean())
 
   np.savetxt("saved_models/adam_72/sorts.txt", sorts)
   np.savetxt("saved_models/adam_72/nominal_rewards.txt", nominal_rewards)
