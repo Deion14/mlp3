@@ -64,6 +64,9 @@ class PolicyModel:
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
     
+    self.mean_layer = HiddenLayer(10, 10, lambda x: x, use_bias=False, zeros=True)
+    self.stdv_layer = HiddenLayer(10, 10, tf.nn.softplus, use_bias=False, zeros=False)
+    
     # get final hidden layer
     with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
         p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
@@ -92,7 +95,7 @@ class PolicyModel:
                                          normalizer_fn=None,
                                          normalizer_params=None,
                                          weights_initializer=init,
-                                         weights_regularizer=self.Reg,
+                                         weights_regularizer=None,
                                          biases_initializer=tf.zeros_initializer(),
                                          biases_regularizer=None,
                                          reuse=None,
@@ -103,16 +106,14 @@ class PolicyModel:
     sign=tf.sign(output)
     absLogP=tf.abs(output)
     P = tf.multiply(sign,tf.nn.softmax(absLogP))
-    
+
+    self.predict_op = P    
+        
     # calculate output and cost
     mean = self.mean_layer.forward(P)
     stdv = self.stdv_layer.forward(P) + 1e-5 # smoothing
 
-    # make them 1-D
-    mean = tf.reshape(mean, [-1])
-    stdv = tf.reshape(stdv, [-1]) 
-
-    norm = tf.contrib.distributions.Normal(mean, stdv)
+    norm = tf.distributions.Normal(mean, stdv)
     
     log_probs = norm.log_prob(self.actions)
     
@@ -166,16 +167,27 @@ class ValueModel:
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
     
-    value_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
-    value_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
-    
     # get final hidden layer
     with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
         v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
-    v_val = tf.transpose(v_val, [1, 0, 2])
-    last = tf.gather(v_val, int(v_val.get_shape()[0]) - 1)
+        
+    v_val = tf.reshape(v_val,[-1,num_hidden*self.T])
     
-    Y_hat = tf.matmul(last, value_weight) + value_bias
+    init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
+    Y_hat = tf.contrib.layers.fully_connected(v_val,#tf.contrib.layers.flatten(h),
+                                         self.A,
+                                         activation_fn=None,
+                                         normalizer_fn=None,
+                                         normalizer_params=None,
+                                         weights_initializer=init,
+                                         weights_regularizer=None,
+                                         biases_initializer=tf.zeros_initializer(),
+                                         biases_regularizer=None,
+                                         reuse=None,
+                                         variables_collections=None,
+                                         outputs_collections=None,
+                                         trainable=True,scope=None)        
+        
     self.predict_op = Y_hat
 
     cost = tf.reduce_sum(tf.square(self.Y - Y_hat))
