@@ -64,28 +64,61 @@ class PolicyModel:
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
     
-
-    policy_weight = tf.Variable(tf.truncated_normal([num_hidden, self.A]))
-    policy_bias = tf.Variable(tf.constant(0.1, shape=[self.A]))
-
     # get final hidden layer
     with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
         p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
-    p_val = tf.transpose(p_val, [1, 0, 2])
-    last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
+        
+    #p_val = tf.transpose(p_val, [1, 0, 2])
+    #last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
     
-    Z = tf.matmul(last, policy_weight) + policy_bias
+    p_val = tf.reshape(p_val,[-1,num_hidden*self.T])
+#    
+#    mean = mean_layer.forward(last)
+#    stdv = stdv_layer.forward(last) + 1e-5 # smoothing
+#    
+#    # make them 1-D
+#    mean = tf.reshape(mean, [-1])
+#    stdv = tf.reshape(stdv, [-1])     
+#    
+#    norm = tf.contrib.distributions.Normal(mean, stdv)
+#    
+#    self.predict_op = tf.clip_by_value(norm.sample(), -1, 1)
+#    
+#    log_probs = norm.log_prob(self.actions)
+    init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
+    output=tf.contrib.layers.fully_connected(p_val,#tf.contrib.layers.flatten(h),
+                                         self.A,
+                                         activation_fn=None,
+                                         normalizer_fn=None,
+                                         normalizer_params=None,
+                                         weights_initializer=init,
+                                         weights_regularizer=self.Reg,
+                                         biases_initializer=tf.zeros_initializer(),
+                                         biases_regularizer=None,
+                                         reuse=None,
+                                         variables_collections=None,
+                                         outputs_collections=None,
+                                         trainable=True,scope=None)
     
-    noise = tf.random_normal(shape=tf.shape(Z), mean=0.0, stddev=1, dtype=tf.float32)
-    Z = Z+noise
+    sign=tf.sign(output)
+    absLogP=tf.abs(output)
+    P = tf.multiply(sign,tf.nn.softmax(absLogP))
     
-    sign = tf.sign(Z)
-    Z = tf.nn.softmax(Z)
-    Z = Z*sign
+    # calculate output and cost
+    mean = self.mean_layer.forward(P)
+    stdv = self.stdv_layer.forward(P) + 1e-5 # smoothing
 
-    self.predict_op = Z
-    cost = -tf.reduce_sum(self.advantages * self.actions + Z)
-    self.train_op = tf.train.AdamOptimizer(1e-1).minimize(cost)
+    # make them 1-D
+    mean = tf.reshape(mean, [-1])
+    stdv = tf.reshape(stdv, [-1]) 
+
+    norm = tf.contrib.distributions.Normal(mean, stdv)
+    
+    log_probs = norm.log_prob(self.actions)
+    
+    cost = -tf.reduce_sum(self.advantages * log_probs + 0.1*norm.entropy())
+    self.train_op = tf.train.AdamOptimizer(1e-3).minimize(cost)
+    
 
   def set_session(self, session):
     self.session = session
@@ -171,6 +204,13 @@ def play_one_td(env, pmodel, vmodel, gamma):
   observation,_ = env.reset()
   done = False
   
+  observations = np.zeros((252,252,30))
+  actions = np.zeros((252,10))
+  advantages = np.zeros((252,10))
+  Gs = np.zeros((252,10))
+  
+  i = 0
+  
   while not done:
     
     action = pmodel.sample_action(observation)
@@ -182,8 +222,17 @@ def play_one_td(env, pmodel, vmodel, gamma):
     V_next = vmodel.predict(observation)
     G = reward + gamma*V_next
     advantage = G - vmodel.predict(prev_observation)
-    pmodel.partial_fit(prev_observation, action, advantage)
-    vmodel.partial_fit(prev_observation, G)
+    
+    
+    observations[i,:,:] = prev_observation
+    actions[i,:] = action
+    advantages[i,:] = advantage
+    Gs[i,:] = G     
+
+    i = i+1;
+  
+  pmodel.partial_fit(observations, actions, advantages)
+  vmodel.partial_fit(observations, Gs)
     
   #return np.array(total_rewards[-150:]).mean(), iters
   return sort, info['nominal_reward']
