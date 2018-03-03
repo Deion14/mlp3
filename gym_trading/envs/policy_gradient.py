@@ -235,9 +235,9 @@ class PolicyGradient(object) :
                     cell_type=self.architecture
 
                     if cell_type == 'GRU':
-                        cell = tf.nn.rnn_cell.GRUCell(num_hidden)
+                        cell = tf.nn.rnn_cell.GRUCell(num_hidden,activation=actFunc)
                     elif cell_type == 'LSTM':
-                        cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True)
+                        cell = tf.nn.rnn_cell.LSTMCell(num_hidden,activation=actFunc, state_is_tuple=True)
                     elif cell_type == 'RNN':
                         cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=actFunc)
 
