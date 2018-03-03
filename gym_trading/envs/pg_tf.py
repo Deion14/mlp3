@@ -68,26 +68,71 @@ class PolicyModel:
     self.stdv_layer = HiddenLayer(10, 10, tf.nn.softplus, use_bias=False, zeros=False)
     
     # get final hidden layer
-    with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
-        p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
-        
-    #p_val = tf.transpose(p_val, [1, 0, 2])
-    #last = tf.gather(p_val, int(p_val.get_shape()[0]) - 1)
+    #with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
+     #   p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
     
-    p_val = tf.reshape(p_val,[-1,num_hidden*self.T])
-#    
-#    mean = mean_layer.forward(last)
-#    stdv = stdv_layer.forward(last) + 1e-5 # smoothing
-#    
-#    # make them 1-D
-#    mean = tf.reshape(mean, [-1])
-#    stdv = tf.reshape(stdv, [-1])     
-#    
-#    norm = tf.contrib.distributions.Normal(mean, stdv)
-#    
-#    self.predict_op = tf.clip_by_value(norm.sample(), -1, 1)
-#    
-#    log_probs = norm.log_prob(self.actions)
+
+    self.num_hiddenRNN=12    
+    self.output_keep_prob=0.8  
+    self.state_keep_prob=0.8
+    self.DropoutVariational_recurrent=False
+    self._num_stocks=10
+    self._variables=3
+    self.NumofLayers=1
+    self.actFunc=tf.nn.leaky_relu
+    self.architecture="LSTM"
+    self.DropoutMemoryStates=False
+    
+    
+    def dropout_state_filter_visitors(state): 
+            ''' Dropout of memory cells Not literature based on tensorflow code'''
+            
+            if isinstance(state, tf.contrib.rnn.LSTMStateTuple): # Never perform dropout on the c state.
+                return tf.contrib.rnn.LSTMStateTuple(c=True, h=True) 
+            elif isinstance(state, tf.TensorArray): 
+                return False 
+            return True
+
+    
+    
+
+    def get_a_cell(num_hidden,i):
+            ''' Function for GRU, RNN, LSTM'''
+
+            cell_type=self.architecture
+
+            if cell_type == 'GRU':
+                cell = tf.nn.rnn_cell.GRUCell(num_hidden,activation=self.actFunc)
+            elif cell_type == 'LSTM':
+                cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True,activation=self.actFunc)
+            elif cell_type == 'RNN':
+                cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=self.actFunc)
+
+#                    pdb.set_trace()
+
+            drop = tf.nn.rnn_cell.DropoutWrapper(cell, 
+                                                 input_keep_prob=1,
+                                                 output_keep_prob=self.output_keep_prob,
+                                                 state_keep_prob=self.state_keep_prob,
+                                                 variational_recurrent=self.DropoutVariational_recurrent,
+                                                 input_size=self._num_stocks*self._variables if i==0 else tf.TensorShape(num_hidden), 
+                                                 dtype=tf.float32,
+                                                 seed=None,
+                                                 dropout_state_filter_visitor=dropout_state_filter_visitors if self.DropoutMemoryStates==True else None                                                               )
+
+            return drop
+
+    ''' Create Stacked Model '''    
+    with tf.name_scope('actor_model'):
+          cell = tf.nn.rnn_cell.MultiRNNCell(
+          [get_a_cell(self.num_hiddenRNN, i) for i in range(self.NumofLayers)])
+    ''' Make it runable '''
+    with tf.variable_scope('actor', initializer=tf.contrib.layers.xavier_initializer()):
+        h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
+        
+    
+    p_val = tf.reshape(h,[-1,num_hidden*self.T])
+
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     output=tf.contrib.layers.fully_connected(p_val,#tf.contrib.layers.flatten(h),
                                          self.A,
@@ -118,7 +163,7 @@ class PolicyModel:
     log_probs = norm.log_prob(self.actions)
     
     cost = -tf.reduce_sum(self.advantages * log_probs + 0.1*norm.entropy())
-    self.train_op = tf.train.AdamOptimizer(1e-3).minimize(cost)
+    self.train_op = tf.train.AdamOptimizer(1e-4).minimize(cost)
     
 
   def set_session(self, session):
@@ -168,10 +213,71 @@ class ValueModel:
     self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
     
     # get final hidden layer
-    with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
-        v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
+   # with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
+    #    v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
+     
         
-    v_val = tf.reshape(v_val,[-1,num_hidden*self.T])
+        
+    self.num_hiddenRNN=12    
+    self.output_keep_prob=0.8  
+    self.state_keep_prob=0.8
+    self.DropoutVariational_recurrent=False
+    self._num_stocks=10
+    self._variables=3
+    self.NumofLayers=1
+    self.actFunc=tf.nn.leaky_relu
+    self.architecture="LSTM"
+    self.DropoutMemoryStates=False
+    
+    
+    def dropout_state_filter_visitors(state): 
+            ''' Dropout of memory cells Not literature based on tensorflow code'''
+            
+            if isinstance(state, tf.contrib.rnn.LSTMStateTuple): # Never perform dropout on the c state.
+                return tf.contrib.rnn.LSTMStateTuple(c=True, h=True) 
+            elif isinstance(state, tf.TensorArray): 
+                return False 
+            return True
+
+    
+    
+
+    def get_a_cell(num_hidden,i):
+            ''' Function for GRU, RNN, LSTM'''
+
+            cell_type=self.architecture
+
+            if cell_type == 'GRU':
+                cell = tf.nn.rnn_cell.GRUCell(num_hidden,activation=self.actFunc)
+            elif cell_type == 'LSTM':
+                cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True,activation=self.actFunc)
+            elif cell_type == 'RNN':
+                cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=self.actFunc)
+
+#                    pdb.set_trace()
+
+            drop = tf.nn.rnn_cell.DropoutWrapper(cell, 
+                                                 input_keep_prob=1,
+                                                 output_keep_prob=self.output_keep_prob,
+                                                 state_keep_prob=self.state_keep_prob,
+                                                 variational_recurrent=self.DropoutVariational_recurrent,
+                                                 input_size=self._num_stocks*self._variables if i==0 else tf.TensorShape(num_hidden), 
+                                                 dtype=tf.float32,
+                                                 seed=None,
+                                                 dropout_state_filter_visitor=dropout_state_filter_visitors if self.DropoutMemoryStates==True else None                                                               )
+
+            return drop
+
+    ''' Create Stacked Model '''    
+    with tf.name_scope('critic_model'):
+          cell = tf.nn.rnn_cell.MultiRNNCell(
+          [get_a_cell(self.num_hiddenRNN, i) for i in range(self.NumofLayers)])
+    ''' Make it runable '''
+    with tf.variable_scope('critic', initializer=tf.contrib.layers.xavier_initializer()):
+        h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
+                 
+        
+    v_val = tf.reshape(h,[-1,num_hidden*self.T])
     
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     Y_hat = tf.contrib.layers.fully_connected(v_val,#tf.contrib.layers.flatten(h),
@@ -192,7 +298,7 @@ class ValueModel:
 
     cost = tf.reduce_sum(tf.square(self.Y - Y_hat))
     self.cost = cost
-    self.train_op = tf.train.AdamOptimizer(1e-1).minimize(cost)
+    self.train_op = tf.train.AdamOptimizer(1e-4).minimize(cost)
 
   def set_session(self, session):
     self.session = session
@@ -226,7 +332,7 @@ def play_one_td(env, pmodel, vmodel, gamma):
   while not done:
     
     action = pmodel.sample_action(observation)
-    
+    tf.nn.leaky_relu
     prev_observation = observation
     observation, reward, done, sort , info, _ = env.step(action)
   
@@ -277,13 +383,18 @@ def main_training():
   sorts = np.empty(N)
   nominal_rewards = np.empty(N)
   for n in range(N):
+    s_time = time.time()
     sort, nominal_reward = play_one_td(env, pmodel, vmodel, gamma)
+    e_time = time.time()
     
     sorts[n] = sort    
     nominal_rewards[n] = nominal_reward
     
     if n % 1 == 0:
-      print("episode:", n, "total reward: %.4f" % sort, "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean())
+      print("episode:", n, 
+            "total reward: %.4f" % sort, 
+            "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
+            "in time: %.3f" %(e_time-s_time))
 
   np.savetxt("saved_models/adam_72/sorts.txt", sorts)
   np.savetxt("saved_models/adam_72/nominal_rewards.txt", nominal_rewards)
