@@ -121,7 +121,7 @@ class PolicyGradient(object) :
         self._tf_x = tf.placeholder(dtype=tf.float32, shape=[None, obs_dim],name="tf_x")
         self._tf_y = tf.placeholder(dtype=tf.float32, shape=[None, num_actions],name="tf_y")
         self._tf_epr = tf.placeholder(dtype=tf.float32, shape=[None,1], name="tf_epr")
-        self.X = tf.placeholder(tf.float32, shape=(1, 252, 30), name='X_for_policy')
+        self.X = tf.placeholder(tf.float32, shape=(None, 252, 30), name='X_for_policy')
         self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
         self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
         
@@ -404,8 +404,8 @@ class PolicyGradient(object) :
 
             
             x=observation
-  
-            feed = {self.X: np.reshape(x, (-1, 252, 30))}
+            WIDTH= self._variables*self._num_stocks
+            feed = {self.X: np.reshape(x, (-1, 252, WIDTH))}
            
             aprob = self._sess.run(self._tf_aprob,feed)
             #pdb.set_trace()
@@ -424,7 +424,7 @@ class PolicyGradient(object) :
 
 
             # record game history
-            #xs.append(x)
+            xs.append(x)
             ys.append(label)
             rs.append(reward)
             day += 1
@@ -434,20 +434,20 @@ class PolicyGradient(object) :
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 #epx = np.vstack(xs)
                 epx = observation
-                #epX = np.reshape(np.vstack(xs), (10, -1, 3))
-                epX = np.reshape(observation, (-1,252,30))
+                epX = np.reshape(np.vstack(xs), (-1, 252, WIDTH))
+                #epX = np.reshape(observation, (-1,252,30))
 
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
         
                 self.NomReward = np.append(self.NomReward, nominal_reward)
                 self.sort = np.append(self.sort, sort)
-               
+                pdb.set_trace()
                 xs,rs,ys = [],[],[] # reset game history
   
 
                 #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
-                pdb.set_trace()
+                
                 feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self._tf_x: epx}
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
@@ -471,6 +471,12 @@ class PolicyGradient(object) :
         pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
         
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
+    
+    
+    
+    
+    
+    
     
     
     
@@ -502,6 +508,11 @@ class PolicyGradient(object) :
         
         
         
+        '''                            TEST CODE               '''
+        
+        
+        
+        
         episode = 0
         observation,Returns = env.reset()
         
@@ -522,7 +533,11 @@ class PolicyGradient(object) :
         t=time.time()           
         while episode < episodes and not victory:
             # stochastically sample a policy from the network
-
+            
+            
+            '''                                 TEST CODE               '''
+            
+            
             
             x=observation
             #feed = {self._tf_x: np.reshape(x, (1,-1)),self.X: np.reshape(x, (10, 252, 3))}
@@ -556,7 +571,11 @@ class PolicyGradient(object) :
                 epr = np.vstack(rs)
                 epy = np.vstack(ys)
                 
-                  
+                
+                '''                                        TEST CODE               '''
+                
+                
+                
                 self.NomReward = np.append(self.NomReward, nominal_reward)
                 self.sort = np.append(self.sort, sort)
                
