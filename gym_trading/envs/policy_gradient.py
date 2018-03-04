@@ -123,8 +123,7 @@ class PolicyGradient(object) :
         self._tf_epr = tf.placeholder(dtype=tf.float32, shape=[None,1], name="tf_epr")
         self.X = tf.placeholder(tf.float32, shape=(None, 252, 30), name='X_for_policy')
         self.actions = tf.placeholder(tf.float32, shape=(None,2), name='actions')
-        self.advantages = tf.placeholder(tf.float32, shape=(None,2), name='advantages')
-        
+        self.conv = tf.placeholder(tf.float32, shape=(None), name='conv')
         
         # tf reward processing (need tf_discounted_epr for policy gradient wizardry)
         self._tf_discounted_epr = self.tf_discount_rewards(self._tf_epr)
@@ -170,6 +169,9 @@ class PolicyGradient(object) :
         elif self.learningRule=="GD":
             optimizer = tf.train.GradientDescentOptimizer(learning_rate)
             
+        #self._tf_discounted_epr = self.get_grad_loss(self._tf_epr, loss)
+        self._tf_discounted_epr = self.get_grad_loss(self._tf_discounted_epr, loss)
+        
         
         tf_grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables(), 
                                                grad_loss=self._tf_discounted_epr)
@@ -178,7 +180,7 @@ class PolicyGradient(object) :
                 return grad
             return tf.clip_by_value(grad, -1.2, 1.2)
         tf_grads_clipped = [(ClipIfNotNone(grad), var) for grad, var in tf_grads]
-        #tf_grads_clipped = [(tf.clip_by_value(tf_grads, -1.2, 1.2), var) for grad, var in tf_grads]
+
         self.tf_grads = tf_grads
         self.tf_grads_clipped = tf_grads_clipped
 #tro/ppo
@@ -187,11 +189,18 @@ class PolicyGradient(object) :
     def get_grads_and_clipping(self):
         return self.tf_grads, self.tf_grads_clipped
     
+    def get_grad_loss(self, tf_r, diff):
+        grad = tf.multiply(tf_r, diff)
+        discount_f = lambda a, v: a*(1/v)*(1/2)
+        grad_loss = tf.scan(discount_f, grad, self.conv)
+        
+        return grad_loss
+    
     def tf_discount_rewards(self, tf_r): #tf_r ~ [game_steps,1]
         discount_f = lambda a, v: a*self._gamma + v;
         tf_r_reverse = tf.scan(discount_f, tf.reverse(tf_r,[0]))
         tf_discounted_r = tf.reverse(tf_r_reverse,[0])
-        tf_discounted_r = tf.clip_by_value(tf_discounted_r, -1.2, 1.2)
+        #tf_discounted_r = tf.clip_by_value(tf_discounted_r, -1.2, 1.2)
 
 
         #tf_r_reverse = tf.scan(discount_f, tf.reverse(tf_r,[True, False]))
@@ -357,7 +366,7 @@ class PolicyGradient(object) :
             output=t1
         else:
              output=t1/abs(t1).sum() 
-        return output
+        return output, stdd
     
     
     
@@ -410,7 +419,7 @@ class PolicyGradient(object) :
             aprob = self._sess.run(self._tf_aprob,feed)
             #pdb.set_trace()
            
-            aprob=PolicyGradient.GaussianNoise(aprob,Returns)
+            aprob, std=PolicyGradient.GaussianNoise(aprob,Returns)
             action=aprob
             #action = np.random.choice(self._num_actions, p=aprob)
             #label = np.zeros_like(aprob) ; label[action] = 1 # make a training 'label'
@@ -428,27 +437,31 @@ class PolicyGradient(object) :
             ys.append(label)
             rs.append(reward)
             day += 1
+            done = True
             if done:
                 print(time.time()-t)    
                 t=time.time()
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 #epx = np.vstack(xs)
-                epx = observation
-                epX = np.reshape(np.vstack(xs), (-1, 252, WIDTH))
-                #epX = np.reshape(observation, (-1,252,30))
+                #epx = observation
+                #epX = np.reshape(np.vstack(xs), (-1, 252, WIDTH))
+                epX = x
 
-                epr = np.vstack(rs)
-                epy = np.vstack(ys)
-        
-                self.NomReward = np.append(self.NomReward, nominal_reward)
-                self.sort = np.append(self.sort, sort)
-                pdb.set_trace()
+                #epr = np.vstack(rs)
+                #epy = np.vstack(ys)
+                epr = reward.reshape(252,1)
+                epy = label
+
+
+                #self.NomReward = np.append(self.NomReward, nominal_reward)
+                #self.sort = np.append(self.sort, sort)
+                #pdb.set_trace()
                 xs,rs,ys = [],[],[] # reset game history
   
-
+        
                 #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
                 
-                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self._tf_x: epx}
+                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self.conv: std}
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
                 if episode % log_freq == 0:
@@ -466,9 +479,9 @@ class PolicyGradient(object) :
                 reward_sum = 0
                 day = 0
         #pdb.set_trace()        
-        Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        #Sort_Returns=  np.vstack([self.sort, self.NomReward])
         
-        pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
+        #pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
         
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
