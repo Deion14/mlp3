@@ -437,29 +437,31 @@ class PolicyGradient(object) :
             ys.append(label)
             rs.append(reward)
             day += 1
+            done = True
             if done:
                 print(time.time()-t)    
                 t=time.time()
                 running_reward = running_reward * 0.99 + reward_sum * 0.01
                 #epx = np.vstack(xs)
-                epx = observation
-                epX = np.reshape(np.vstack(xs), (-1, 252, WIDTH))
-                #epX = np.reshape(observation, (-1,252,30))
+                #epx = observation
+                #epX = np.reshape(np.vstack(xs), (-1, 252, WIDTH))
+                epX = x
 
-                epr = np.vstack(rs)
-                epy = np.vstack(ys)
-                #pdb.set_trace()
+                #epr = np.vstack(rs)
+                #epy = np.vstack(ys)
+                epr = reward.reshape(252,1)
+                epy = label
 
 
-                self.NomReward = np.append(self.NomReward, nominal_reward)
-                self.sort = np.append(self.sort, sort)
+                #self.NomReward = np.append(self.NomReward, nominal_reward)
+                #self.sort = np.append(self.sort, sort)
                 #pdb.set_trace()
                 xs,rs,ys = [],[],[] # reset game history
   
         
                 #alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
                 
-                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self._tf_x: epx, self.conv: std}
+                feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self.conv: std}
                 _ = self._sess.run(self._train_op,feed) # parameter update
 
                 if episode % log_freq == 0:
@@ -477,9 +479,9 @@ class PolicyGradient(object) :
                 reward_sum = 0
                 day = 0
         #pdb.set_trace()        
-        Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        #Sort_Returns=  np.vstack([self.sort, self.NomReward])
         
-        pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
+        #pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
         
         return alldf, pd.DataFrame({'simror':simrors,'mktror':mktrors})
     
