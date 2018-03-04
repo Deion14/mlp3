@@ -62,7 +62,7 @@ class PolicyModel:
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
-    self.advantages = tf.placeholder(tf.float32, shape=(None,self.A), name='advantages')
+    self.advantages = tf.placeholder(tf.float32, shape=(None,1), name='advantages')
     
     self.mean_layer = HiddenLayer(10, 10, lambda x: x, use_bias=False, zeros=True)
     self.stdv_layer = HiddenLayer(10, 10, tf.nn.softplus, use_bias=False, zeros=False)
@@ -78,7 +78,7 @@ class PolicyModel:
     self.DropoutVariational_recurrent=False
     self._num_stocks=10
     self._variables=3
-    self.NumofLayers=1
+    self.NumofLayers=2
     self.actFunc=tf.nn.leaky_relu
     self.architecture="LSTM"
     self.DropoutMemoryStates=False
@@ -174,7 +174,7 @@ class PolicyModel:
     X = np.reshape(X, (-1, self.T, self.D))
     
     actions = np.reshape(actions, (-1, self.A))
-    advantages = np.reshape(advantages, (-1, self.A))
+    advantages = np.reshape(advantages, (-1, 1))
     self.session.run(
       self.train_op,
       feed_dict={
@@ -210,7 +210,7 @@ class ValueModel:
 
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
-    self.Y = tf.placeholder(tf.float32, shape=(None,self.A), name='Y')
+    self.Y = tf.placeholder(tf.float32, shape=(None,1), name='Y')
     
     # get final hidden layer
    # with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
@@ -224,7 +224,7 @@ class ValueModel:
     self.DropoutVariational_recurrent=False
     self._num_stocks=10
     self._variables=3
-    self.NumofLayers=1
+    self.NumofLayers=2
     self.actFunc=tf.nn.leaky_relu
     self.architecture="LSTM"
     self.DropoutMemoryStates=False
@@ -281,7 +281,7 @@ class ValueModel:
     
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     Y_hat = tf.contrib.layers.fully_connected(v_val,#tf.contrib.layers.flatten(h),
-                                         self.A,
+                                         1,
                                          activation_fn=None,
                                          normalizer_fn=None,
                                          normalizer_params=None,
@@ -306,7 +306,7 @@ class ValueModel:
   def partial_fit(self, X, Y):
 
     X = np.reshape(X, (-1, self.T, self.D))
-    Y = np.reshape(Y, (-1, self.A))
+    Y = np.reshape(Y, (-1, 1))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
     self.costs.append(cost)
@@ -322,35 +322,18 @@ def play_one_td(env, pmodel, vmodel, gamma):
   observation,_ = env.reset()
   done = False
   
-  observations = np.zeros((252,252,30))
-  actions = np.zeros((252,10))
-  advantages = np.zeros((252,10))
-  Gs = np.zeros((252,10))
+  action = pmodel.sample_action(observation)
+  prev_observation = observation
+  observation, reward, done, sort , info, _ = env.step(action)
+  reward = np.reshape(reward, (-1,1))
   
-  i = 0
+  # update the models
+  V_next = vmodel.predict(observation)
+  G = reward + gamma*V_next
+  advantage = G - vmodel.predict(prev_observation)
   
-  while not done:
-    
-    action = pmodel.sample_action(observation)
-    tf.nn.leaky_relu
-    prev_observation = observation
-    observation, reward, done, sort , info, _ = env.step(action)
-  
-    # update the models
-    V_next = vmodel.predict(observation)
-    G = reward + gamma*V_next
-    advantage = G - vmodel.predict(prev_observation)
-    
-    
-    observations[i,:,:] = prev_observation
-    actions[i,:] = action
-    advantages[i,:] = advantage
-    Gs[i,:] = G     
-
-    i = i+1;
-  
-  pmodel.partial_fit(observations, actions, advantages)
-  vmodel.partial_fit(observations, Gs)
+  pmodel.partial_fit(prev_observation, action, advantage)
+  vmodel.partial_fit(prev_observation, G)
     
   #return np.array(total_rewards[-150:]).mean(), iters
   return sort, info['nominal_reward']
