@@ -183,7 +183,6 @@ class PolicyGradient(object) :
 
         self.tf_grads = tf_grads
         self.tf_grads_clipped = tf_grads_clipped
-#tro/ppo
         self._train_op = optimizer.apply_gradients(tf_grads)
     
     def get_grads_and_clipping(self):
@@ -452,9 +451,8 @@ class PolicyGradient(object) :
                 epr = reward.reshape(252,1)
                 epy = label
 
-
-                #self.NomReward = np.append(self.NomReward, nominal_reward)
-                #self.sort = np.append(self.sort, sort)
+                self.NomReward = np.append(self.NomReward, nominal_reward)
+                self.sort = np.append(self.sort, sort)
                 #pdb.set_trace()
                 xs,rs,ys = [],[],[] # reset game history
   
@@ -463,7 +461,6 @@ class PolicyGradient(object) :
                 
                 feed = {self.X: epX, self._tf_epr: epr, self._tf_y: epy, self.conv: std}
                 _ = self._sess.run(self._train_op,feed) # parameter update
-
                 if episode % log_freq == 0:
                     log.info('year #%6d, mean reward: %8.4f, sim ret: %8.4f, mkt ret: %8.4f, net: %8.4f', episode,
                              sort, simrors[episode],mktrors[episode], simrors[episode]-mktrors[episode])
@@ -479,7 +476,7 @@ class PolicyGradient(object) :
                 reward_sum = 0
                 day = 0
         #pdb.set_trace()        
-        #Sort_Returns=  np.vstack([self.sort, self.NomReward])
+        Sort_Returns=  np.vstack([self.sort, self.NomReward])
         
         #pkl.dump(Sort_Returns, open( self.filename, 'wb'))   
         
