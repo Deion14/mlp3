@@ -199,21 +199,14 @@ class TradingSim(object) :
 
 
     costs = np.dot(action, tradecosts)
-    #costs = tradecosts*abs(action)
 
-    #trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
     self.costs = costs
-    #reward= np.dot(retrn, action.reshape(-1,1))-self.costs[self.step]
     reward= np.sum((retrn*action-costs), axis=1)
-    nominal_reward = np.sum(np.sum((retrn*action-costs), axis=1), axis=0)
-    #self.total_returns = self.total_returns + nominal_reward
 
-    #oldsort = self.mkt_retrns[self.step-1,:]
     newsort = 0
     sortchange = 0
-
-
-    self.stdev_neg_returns = np.sqrt(np.std(reward[reward < 0]))
+    
+    self.stdev_neg_returns = np.std(reward[reward < 0])
     if self.stdev_neg_returns == 0:
         self.stdev_neg_returns = .001
 
@@ -221,37 +214,8 @@ class TradingSim(object) :
     f = np.vectorize(get_sortchange)
     sortchange = f(reward)
     newsort = sortchange.sum()
-    '''
-    if nominal_reward < 0:
-        self.negative_returns = np.append(self.negative_returns, nominal_reward)
-        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
-    else:
-        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
-    if stdev_neg_returns == 0:
-        newsort = self.total_returns / .1
-    else:
-        newsort = self.total_returns / stdev_neg_returns
+    nominal_reward = reward.sum()
     
-
-    if oldsort == 0:
-        sortchange = newsort
-    else:
-        sortchange = (newsort - oldsort)/oldsort
-
-        
-    self.mkt_retrns[self.step,:] = newsort
-             
-    
-    #reward = ( (bod_posn * retrn) - self.costs[self.step] )
-    #pdb.set_trace()
-   # self.strat_retrns[self.step] = sortchange
-
-    #if self.step != 0 :
-    #  self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
-    #  self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
-    
-    #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
-    '''
     info = { 'reward': reward,  'costs':self.costs ,'nominal_reward':nominal_reward}
 
     self.step += 1      
