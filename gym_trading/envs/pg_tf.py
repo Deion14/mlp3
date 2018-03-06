@@ -55,10 +55,6 @@ class PolicyModel:
     self.A = A
     self.T = 252    
     
-    #initilize RNN
-    num_hidden = 12
-    policy_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
-    
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
@@ -72,7 +68,7 @@ class PolicyModel:
      #   p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
     
 
-    self.num_hiddenRNN=12    
+    self.num_hiddenRNN=24    
     self.output_keep_prob=0.8  
     self.state_keep_prob=0.8
     self.DropoutVariational_recurrent=False
@@ -102,11 +98,11 @@ class PolicyModel:
             cell_type=self.architecture
 
             if cell_type == 'GRU':
-                cell = tf.nn.rnn_cell.GRUCell(num_hidden,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.GRUCell(self.num_hiddenRNN,activation=self.actFunc)
             elif cell_type == 'LSTM':
-                cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.LSTMCell(self.num_hiddenRNN, state_is_tuple=True,activation=self.actFunc)
             elif cell_type == 'RNN':
-                cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.BasicRNNCell(self.num_hiddenRNN,activation=self.actFunc)
 
 #                    pdb.set_trace()
 
@@ -131,7 +127,7 @@ class PolicyModel:
         h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
         
     
-    p_val = tf.reshape(h,[-1,num_hidden*self.T])
+    p_val = tf.reshape(h,[-1,self.num_hiddenRNN*self.T])
 
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     output=tf.contrib.layers.fully_connected(p_val,#tf.contrib.layers.flatten(h),
@@ -155,14 +151,16 @@ class PolicyModel:
     self.predict_op = P    
         
     # calculate output and cost
-    mean = self.mean_layer.forward(P)
-    stdv = self.stdv_layer.forward(P) + 1e-5 # smoothing
-
-    norm = tf.distributions.Normal(mean, stdv)
+#    mean = self.mean_layer.forward(P)
+#    stdv = self.stdv_layer.forward(P) + 1e-5 # smoothing
+#
+#    norm = tf.distributions.Normal(mean, stdv)
+#    log_probs = norm.log_prob(self.actions)
     
-    log_probs = norm.log_prob(self.actions)
+    action_ratio = tf.div(P,self.actions)
+    action_ratio = tf.clip_by_value(action_ratio, -1.2, 1.2)
     
-    cost = -tf.reduce_sum(self.advantages * log_probs + 0.1*norm.entropy())
+    cost = -tf.reduce_sum(self.advantages * action_ratio)
     self.train_op = tf.train.AdamOptimizer(1e-4).minimize(cost)
     
 
@@ -204,10 +202,6 @@ class ValueModel:
     self.T = 252
     self.costs = []
 
-    #initilize RNN
-    num_hidden = 12
-    value_cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden)
-
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,1), name='Y')
@@ -218,7 +212,7 @@ class ValueModel:
      
         
         
-    self.num_hiddenRNN=12    
+    self.num_hiddenRNN=24    
     self.output_keep_prob=0.8  
     self.state_keep_prob=0.8
     self.DropoutVariational_recurrent=False
@@ -248,11 +242,11 @@ class ValueModel:
             cell_type=self.architecture
 
             if cell_type == 'GRU':
-                cell = tf.nn.rnn_cell.GRUCell(num_hidden,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.GRUCell(self.num_hiddenRNN,activation=self.actFunc)
             elif cell_type == 'LSTM':
-                cell = tf.nn.rnn_cell.LSTMCell(num_hidden, state_is_tuple=True,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.LSTMCell(self.num_hiddenRNN, state_is_tuple=True,activation=self.actFunc)
             elif cell_type == 'RNN':
-                cell = tf.nn.rnn_cell.BasicRNNCell(num_hidden,activation=self.actFunc)
+                cell = tf.nn.rnn_cell.BasicRNNCell(self.num_hiddenRNN,activation=self.actFunc)
 
 #                    pdb.set_trace()
 
@@ -277,7 +271,7 @@ class ValueModel:
         h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
                  
         
-    v_val = tf.reshape(h,[-1,num_hidden*self.T])
+    v_val = tf.reshape(h,[-1,self.num_hiddenRNN*self.T])
     
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     Y_hat = tf.contrib.layers.fully_connected(v_val,#tf.contrib.layers.flatten(h),
@@ -379,11 +373,11 @@ def main_training():
             "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
             "in time: %.3f" %(e_time-s_time))
 
-  np.savetxt("saved_models/adam_72/sorts.txt", sorts)
-  np.savetxt("saved_models/adam_72/nominal_rewards.txt", nominal_rewards)
+  np.savetxt("saved_models/adam_10x4_24h_2l/sorts.txt", sorts)
+  np.savetxt("saved_models/adam_10x4_24h_2l/nominal_rewards.txt", nominal_rewards)
   
-  saver = tf.train.Saver()
-  saver.save(session, "saved_models/adam_72/model.ckpt")
+  saver = tf.train.Saver(save_relative_paths=True)
+  saver.save(session, "saved_models/adam_10x4_24h_2l/model.ckpt")
   
   #print(saved_path)
   
