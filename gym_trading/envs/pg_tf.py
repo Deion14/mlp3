@@ -337,7 +337,7 @@ def main_training():
     
   env = gym.make('trading-v0')
   env = env.unwrapped
-  
+    
   #D = ft.dimensions
   D,A = 30, 10
   pmodel = PolicyModel(D, A)
