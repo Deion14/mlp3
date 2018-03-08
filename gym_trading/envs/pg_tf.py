@@ -48,7 +48,20 @@ class HiddenLayer:
 
 # approximates pi(a | s)
 class PolicyModel:
-  def __init__(self, D, A):
+  def __init__(self, D, A, 
+               NumOfLayers,
+               Num_Of_variables,
+               LR,
+               architecture,
+               actFunc,
+               learning_rate,
+               regulizer,
+               regulizerScale,
+               num_hiddenRNN,
+               DropoutMemoryStates,
+               DropoutVariational_recurrent,
+               output_keep_prob,
+               state_keep_prob):
       
       
     self.D = D
@@ -60,24 +73,40 @@ class PolicyModel:
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,1), name='advantages')
     
-    self.mean_layer = HiddenLayer(10, 10, lambda x: x, use_bias=False, zeros=True)
-    self.stdv_layer = HiddenLayer(10, 10, tf.nn.softplus, use_bias=False, zeros=False)
+ #   self.mean_layer = HiddenLayer(10, 10, lambda x: x, use_bias=False, zeros=True)
+ #   self.stdv_layer = HiddenLayer(10, 10, tf.nn.softplus, use_bias=False, zeros=False)
     
     # get final hidden layer
     #with tf.variable_scope('policy_rnn', reuse=tf.AUTO_REUSE): 
      #   p_val, _  = tf.nn.dynamic_rnn(policy_cell, self.X, dtype=tf.float32)
     
 
-    self.num_hiddenRNN=24    
-    self.output_keep_prob=0.8  
-    self.state_keep_prob=0.8
-    self.DropoutVariational_recurrent=False
-    self._num_stocks=10
-    self._variables=3
-    self.NumofLayers=2
-    self.actFunc=tf.nn.leaky_relu
-    self.architecture="LSTM"
-    self.DropoutMemoryStates=False
+    self.num_hiddenRNN=num_hiddenRNN
+    self.output_keep_prob=output_keep_prob  
+    self.state_keep_prob=state_keep_prob
+    self.DropoutVariational_recurrent=DropoutVariational_recurrent
+    self._variables=Num_Of_variables
+    self.NumofLayers=NumOfLayers
+    
+    if actFunc=="sigmoid":
+        self.actFunc=tf.nn.sigmoid
+    elif  actFunc=="relu":
+            self.actFunc=tf.nn.relu
+    elif actFunc=="lrelu":
+            self.actFunc= tf.nn.leaky_relu
+    elif actFunc=="elu":
+            self.actFunc= tf.nn.elu   
+    elif actFunc=="selu":
+            self.actFunc= tf.nn.selu                   
+    else:
+        assert("wrong acttivation function")
+
+
+
+    self.architecture=architecture
+    self.DropoutMemoryStates=DropoutMemoryStates
+    self.learningRule = LR
+    self.learning_rate = learning_rate
     
     
     def dropout_state_filter_visitors(state): 
@@ -111,7 +140,7 @@ class PolicyModel:
                                                  output_keep_prob=self.output_keep_prob,
                                                  state_keep_prob=self.state_keep_prob,
                                                  variational_recurrent=self.DropoutVariational_recurrent,
-                                                 input_size=self._num_stocks*self._variables if i==0 else tf.TensorShape(num_hidden), 
+                                                 input_size=self.A*self._variables if i==0 else tf.TensorShape(num_hidden), 
                                                  dtype=tf.float32,
                                                  seed=None,
                                                  dropout_state_filter_visitor=dropout_state_filter_visitors if self.DropoutMemoryStates==True else None                                                               )
@@ -161,8 +190,22 @@ class PolicyModel:
     action_ratio = tf.clip_by_value(action_ratio, -1.2, 1.2)
     
     cost = -tf.reduce_sum(self.advantages * action_ratio)
-    self.train_op = tf.train.AdamOptimizer(1e-4).minimize(cost)
+    self.cost = cost
     
+    # Different Learning Rules
+    if self.learningRule=="RMSProp":
+        self.train_op = tf.train.RMSPropOptimizer(self.learning_rate).minimize(cost)
+    elif self.learningRule=="Adam":
+        self.train_op = tf.train.AdamOptimizer(self.learning_rate,
+                                           beta1=0.9,
+                                           beta2=0.999).minimize(cost)
+    elif self.learningRule=="Mom":
+        self.train_op = tf.train.MomentumOptimizer(self.learning_rate,
+                                            momentum=0.8,
+                                            use_locking=False,
+                                            use_nesterov=True).minimize(cost)
+    elif self.learningRule=="GD":
+        self.train_op = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(cost)
 
   def set_session(self, session):
     self.session = session
@@ -195,33 +238,58 @@ class PolicyModel:
 
 # approximates V(s)
 class ValueModel:
-  def __init__(self, D, A):
+  def __init__(self, D, A, 
+               NumOfLayers,
+               Num_Of_variables,
+               LR,
+               architecture,
+               actFunc,
+               learning_rate,
+               regulizer,
+               regulizerScale,
+               num_hiddenRNN,
+               DropoutMemoryStates,
+               DropoutVariational_recurrent,
+               output_keep_prob,
+               state_keep_prob):
     
     self.D = D
     self.A = A
     self.T = 252
     self.costs = []
 
-    # inputs and targets
+#    # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
-    self.Y = tf.placeholder(tf.float32, shape=(None,1), name='Y')
+    self.Y = tf.placeholder(tf.float32, shape=(None,1), name='Y')     
+        
+        
+    self.num_hiddenRNN=num_hiddenRNN    
+    self.output_keep_prob=output_keep_prob  
+    self.state_keep_prob=state_keep_prob
+    self.DropoutVariational_recurrent=DropoutVariational_recurrent
+    self._variables=Num_Of_variables
+    self.NumofLayers=NumOfLayers
     
-    # get final hidden layer
-   # with tf.variable_scope('value_rnn', reuse=tf.AUTO_REUSE): 
-    #    v_val, _  = tf.nn.dynamic_rnn(value_cell, self.X, dtype=tf.float32)
-     
-        
-        
-    self.num_hiddenRNN=24    
-    self.output_keep_prob=0.8  
-    self.state_keep_prob=0.8
-    self.DropoutVariational_recurrent=False
-    self._num_stocks=10
-    self._variables=3
-    self.NumofLayers=2
-    self.actFunc=tf.nn.leaky_relu
-    self.architecture="LSTM"
-    self.DropoutMemoryStates=False
+
+    if actFunc=="sigmoid":
+        self.actFunc=tf.nn.sigmoid
+    elif  actFunc=="relu":
+            self.actFunc=tf.nn.relu
+    elif actFunc=="lrelu":
+            self.actFunc= tf.nn.leaky_relu
+    elif actFunc=="elu":
+            self.actFunc= tf.nn.elu   
+    elif actFunc=="selu":
+            self.actFunc= tf.nn.selu                   
+    else:
+        assert("wrong acttivation function")
+
+
+
+    self.architecture=architecture
+    self.DropoutMemoryStates=DropoutMemoryStates
+    self.learningRule = LR
+    self.learning_rate = learning_rate
     
     
     def dropout_state_filter_visitors(state): 
@@ -255,7 +323,7 @@ class ValueModel:
                                                  output_keep_prob=self.output_keep_prob,
                                                  state_keep_prob=self.state_keep_prob,
                                                  variational_recurrent=self.DropoutVariational_recurrent,
-                                                 input_size=self._num_stocks*self._variables if i==0 else tf.TensorShape(num_hidden), 
+                                                 input_size=self.A*self._variables if i==0 else tf.TensorShape(num_hidden), 
                                                  dtype=tf.float32,
                                                  seed=None,
                                                  dropout_state_filter_visitor=dropout_state_filter_visitors if self.DropoutMemoryStates==True else None                                                               )
@@ -292,7 +360,21 @@ class ValueModel:
 
     cost = tf.reduce_sum(tf.square(self.Y - Y_hat))
     self.cost = cost
-    self.train_op = tf.train.AdamOptimizer(1e-4).minimize(cost)
+    
+    # Different Learning Rules
+    if self.learningRule=="RMSProp":
+        self.train_op = tf.train.RMSPropOptimizer(self.learning_rate).minimize(cost)
+    elif self.learningRule=="Adam":
+        self.train_op = tf.train.AdamOptimizer(self.learning_rate,
+                                           beta1=0.9,
+                                           beta2=0.999).minimize(cost)
+    elif self.learningRule=="Mom":
+        self.train_op = tf.train.MomentumOptimizer(self.learning_rate,
+                                            momentum=0.8,
+                                            use_locking=False,
+                                            use_nesterov=True).minimize(cost)
+    elif self.learningRule=="GD":
+        self.train_op = tf.train.GradientDescentOptimizer(self.learning_rate).minimize(cost)
 
   def set_session(self, session):
     self.session = session
@@ -333,58 +415,111 @@ def play_one_td(env, pmodel, vmodel, gamma):
   return sort, info['nominal_reward']
   
 
-def main_training():
+def training():
     
   env = gym.make('trading-v0')
   env = env.unwrapped
+
+  actFuncs=["relu", "lrelu", "selu", "elu"]
+  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_selu","RNN_Adam_10e4_elu"]
+  
+  NumOfHiddLayers = 1    
+  output_keep_prob = 0.8
+  state_keep_prob = 0.8
+  DropoutVariational_recurrent = False
+  Num_Of_variables = 3
+  num_hiddenRNN = 24
+  architecture = 'RNN'
+  DropoutMemoryStates = False
+  LR = 'Adam'
+  learning_rate = 1e-4
+  regulizer="l2"
+  regulizerScale=0.0001
     
-  #D = ft.dimensions
   D,A = 30, 10
-  pmodel = PolicyModel(D, A)
-  vmodel = ValueModel(D, A)
   
-  init = tf.global_variables_initializer()
-  session = tf.InteractiveSession()
-  session.run(init)    
-  
-  pmodel.set_session(session)
-  vmodel.set_session(session)
-  gamma = 0.95
-
-  if 'monitor' in sys.argv:
-    filename = os.path.basename(__file__).split('.')[0]
-    monitor_dir = './' + filename + '_' + str(datetime.now())
-    env = wrappers.Monitor(env, monitor_dir)
-
-  N = 5000
-  sorts = np.empty(N)
-  nominal_rewards = np.empty(N)
-  for n in range(N):
-    s_time = time.time()
-    sort, nominal_reward = play_one_td(env, pmodel, vmodel, gamma)
-    e_time = time.time()
+  for i in range(len(actFuncs)):      
+      tf.reset_default_graph()
+      #D = ft.dimensions
+ 
+      pmodel = PolicyModel(D, A, 
+                           NumOfLayers=NumOfHiddLayers,
+                           Num_Of_variables=Num_Of_variables,
+                           LR=LR,
+                           architecture=architecture,
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
+                           regulizer =regulizer,
+                           regulizerScale=regulizerScale,
+                           num_hiddenRNN=num_hiddenRNN,
+                           DropoutMemoryStates= DropoutMemoryStates,
+                           DropoutVariational_recurrent=DropoutVariational_recurrent,
+                           output_keep_prob=output_keep_prob,
+                           state_keep_prob=state_keep_prob)
+      
+      vmodel = ValueModel(D, A, 
+                           NumOfLayers=NumOfHiddLayers,
+                           Num_Of_variables=Num_Of_variables,
+                           LR=LR,
+                           architecture=architecture,
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
+                           regulizer =regulizer,
+                           regulizerScale=regulizerScale,
+                           num_hiddenRNN=num_hiddenRNN,
+                           DropoutMemoryStates= DropoutMemoryStates,
+                           DropoutVariational_recurrent=DropoutVariational_recurrent,
+                           output_keep_prob=output_keep_prob,
+                           state_keep_prob=state_keep_prob)
+      
+      init = tf.global_variables_initializer()
+      session = tf.InteractiveSession()
+      session.run(init)    
+      
+      pmodel.set_session(session)
+      vmodel.set_session(session)
+      gamma = 0.95
     
-    sorts[n] = sort    
-    nominal_rewards[n] = nominal_reward
+      if 'monitor' in sys.argv:
+        filename = os.path.basename(__file__).split('.')[0]
+        monitor_dir = './' + filename + '_' + str(datetime.now())
+        env = wrappers.Monitor(env, monitor_dir)
     
-    if n % 1 == 0:
-      print("episode:", n, 
-            "total reward: %.4f" % sort, 
-            "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
-            "in time: %.3f" %(e_time-s_time))
-
-  np.savetxt("saved_models/adam_10x4_24h_2l/sorts.txt", sorts)
-  np.savetxt("saved_models/adam_10x4_24h_2l/nominal_rewards.txt", nominal_rewards)
-  
-  saver = tf.train.Saver(save_relative_paths=True)
-  saver.save(session, "saved_models/adam_10x4_24h_2l/model.ckpt")
+      N = 5000
+      sorts = np.empty(N)
+      nominal_rewards = np.empty(N)
+      for n in range(N):
+        s_time = time.time()
+        sort, nominal_reward = play_one_td(env, pmodel, vmodel, gamma)
+        e_time = time.time()
+        
+        sorts[n] = sort    
+        nominal_rewards[n] = nominal_reward
+        
+        if n % 1 == 0:
+            print("episode:", n, 
+                "total reward: %.4f" % sort, 
+                "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
+                "in time: %.3f" %(e_time-s_time))
+        
+      
+      filenameModel = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/saved_models/" + name[i]
+        
+      if not os.path.exists(filenameModel):
+          os.makedirs(filenameModel)   
+            
+      np.savetxt(filenameModel+"/sorts.txt", sorts)
+      np.savetxt(filenameModel+"/nominal_rewards.txt", nominal_rewards)
+      
+      saver = tf.train.Saver(save_relative_paths=True)
+      saver.save(session, filenameModel+"/model.ckpt")
   
   #print(saved_path)
   
-  plt.plot(sorts)
-  plt.plot(nominal_rewards)
-  plt.title("Rewards")
-  plt.show()
+#  plt.plot(sorts)
+#  plt.plot(nominal_rewards)
+#  plt.title("Rewards")
+#  plt.show()
 
   #plot_running_avg(totalrewards)
   #plot_cost_to_go(env, vmodel) 
@@ -402,7 +537,7 @@ def make_testing_predictions(env, pmodel):
   totalreward = sort
   return totalreward    
   
-def main_testing():
+def testing():
     
   env_testing = gym.make('testing-v0')
   env_testing = env_testing.unwrapped
@@ -431,7 +566,7 @@ def main_testing():
 if __name__ == '__main__':
   
   s_time = time.time()
-  main_training()
+  training()
   e_time = time.time()
   
   print(e_time-s_time)
