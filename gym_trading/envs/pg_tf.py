@@ -420,9 +420,10 @@ def training():
   env = gym.make('trading-v0')
   env = env.unwrapped
 
-  actFuncs=["relu", "lrelu", "selu", "elu"]
-  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_selu","RNN_Adam_10e4_elu"]
   
+  name=["RNN_GD_10e5_relu","RNN_GD_10e6_relu","RNN_Adam_10e5_relu","RNN_Adam_10e3_relu","RNN_Adam_10e2_relu"]
+  
+  actFunc="relu"
   NumOfHiddLayers = 1    
   output_keep_prob = 0.8
   state_keep_prob = 0.8
@@ -431,24 +432,24 @@ def training():
   num_hiddenRNN = 24
   architecture = 'RNN'
   DropoutMemoryStates = False
-  LR = 'Adam'
-  learning_rate = 1e-4
+  LR = ['GD','GD','Adam','Adam','Adam']
+  learning_rate = [1e-5,1e-6,1e-5,1e-3,1e-2]
   regulizer="l2"
   regulizerScale=0.0001
     
   D,A = 30, 10
   
-  for i in range(len(actFuncs)):      
+  for i in range(len(name)):      
       tf.reset_default_graph()
       #D = ft.dimensions
  
       pmodel = PolicyModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR,
+                           LR=LR[i],
                            architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           actFunc=actFunc,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
@@ -460,10 +461,10 @@ def training():
       vmodel = ValueModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR,
+                           LR=LR[i],
                            architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           actFunc=actFunc,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
@@ -534,9 +535,10 @@ def make_testing_predictions(env, pmodel):
     
   observation, reward, done, sort , info, _ = env.step(action)
   #print(action)
-  totalreward = sort
-  return totalreward    
+  return sort, info['nominal_reward']     
   
+    
+
 def testing():
     
   env_testing = gym.make('testing-v0')
@@ -544,7 +546,104 @@ def testing():
   
   tf.reset_default_graph()
   
-  D, A = 30,10
+  actFuncs=["relu", "lrelu", "selu", "elu"]
+  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_selu","RNN_Adam_10e4_elu"]
+  
+  NumOfHiddLayers = 1    
+  output_keep_prob = 0.8
+  state_keep_prob = 0.8
+  DropoutVariational_recurrent = False
+  Num_Of_variables = 3
+  num_hiddenRNN = 24
+  architecture = 'RNN'
+  DropoutMemoryStates = False
+  LR = 'Adam'
+  learning_rate = 1e-4
+  regulizer="l2"
+  regulizerScale=0.0001
+    
+  D,A = 30, 10  
+  
+  for i in range(len(actFuncs)):      
+      tf.reset_default_graph()
+      #D = ft.dimensions
+ 
+      pmodel = PolicyModel(D, A, 
+                           NumOfLayers=NumOfHiddLayers,
+                           Num_Of_variables=Num_Of_variables,
+                           LR=LR,
+                           architecture=architecture,
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
+                           regulizer =regulizer,
+                           regulizerScale=regulizerScale,
+                           num_hiddenRNN=num_hiddenRNN,
+                           DropoutMemoryStates= DropoutMemoryStates,
+                           DropoutVariational_recurrent=DropoutVariational_recurrent,
+                           output_keep_prob=output_keep_prob,
+                           state_keep_prob=state_keep_prob)
+      
+      vmodel = ValueModel(D, A, 
+                           NumOfLayers=NumOfHiddLayers,
+                           Num_Of_variables=Num_Of_variables,
+                           LR=LR,
+                           architecture=architecture,
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
+                           regulizer =regulizer,
+                           regulizerScale=regulizerScale,
+                           num_hiddenRNN=num_hiddenRNN,
+                           DropoutMemoryStates= DropoutMemoryStates,
+                           DropoutVariational_recurrent=DropoutVariational_recurrent,
+                           output_keep_prob=output_keep_prob,
+                           state_keep_prob=state_keep_prob)
+      
+      saver = tf.train.Saver()
+      session = tf.InteractiveSession()
+      path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
+      saver.restore(session, path+"/saved_models/RNN_Adam_10e4_"+actFuncs[i]+"/model.ckpt")
+      
+      pmodel.set_session(session)
+      vmodel.set_session(session)
+      
+    
+      if 'monitor' in sys.argv:
+        filename = os.path.basename(__file__).split('.')[0]
+        monitor_dir = './' + filename + '_' + str(datetime.now())
+        env_testing = wrappers.Monitor(env_testing, monitor_dir)
+    
+      N = 1
+      sorts = np.empty(N)
+      nominal_rewards = np.empty(N)
+      
+      for n in range(N):
+        s_time = time.time()
+        sort, nominal_reward = make_testing_predictions(env_testing, pmodel)
+        e_time = time.time()
+        
+        sorts[n] = sort    
+        nominal_rewards[n] = nominal_reward
+        
+        if n % 1 == 0:
+            print("episode:", n, 
+                "total reward: %.4f" % sort, 
+                "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
+                "in time: %.3f" %(e_time-s_time))
+        
+      
+      filenameModel = path+"/saved_models/RNN_Adam_10e4_"+actFuncs[i]+"/model.ckpt"
+        
+      if not os.path.exists(filenameModel):
+          os.makedirs(filenameModel)   
+            
+      np.savetxt(filenameModel+"/sorts_test.txt", sorts)
+      np.savetxt(filenameModel+"/nominal_rewards_test.txt", nominal_rewards)
+      
+      saver = tf.train.Saver(save_relative_paths=True)
+      saver.save(session, filenameModel+"/model.ckpt")
+  
+  
+  
   pmodel = PolicyModel(D, A)
   vmodel = ValueModel(D, A)  
   

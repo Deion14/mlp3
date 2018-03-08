@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Feb 12 20:59:16 2018
+Created on Thu Mar  8 13:02:15 2018
 
 @author: s1749290
 """
@@ -9,17 +9,27 @@ Created on Mon Feb 12 20:59:16 2018
 import numpy as np
 import matplotlib.pyplot as plt
 
-adam = np.loadtxt('saved_models/adam_0.1/nominal_rewards.txt')
-rms = np.loadtxt('saved_models/rms_0.1/nominal_rewards.txt')
+path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
 
-plt.hist(adam, alpha=0.5, bins=100)
-plt.hist(rms, alpha=0.5, bins=100)
+relu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_relu/sorts.txt")
+lrelu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_lrelu/sorts.txt")
+elu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
+selu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_selu/sorts.txt")
 
-plt.show()
+def moving_average(a, n=3) :
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
 
-adam = np.loadtxt('saved_models/adam_0.1/sorts.txt')
-rms = np.loadtxt('saved_models/rms_0.1/sorts.txt')
+relu = moving_average(relu, n=100)
+lrelu = moving_average(lrelu, n=100)
+elu = moving_average(elu, n=100)
+selu = moving_average(selu, n=100)
 
-plt.hist(adam, alpha=0.5)
-plt.hist(rms, alpha=0.5)
+plt.plot(relu, label='relu')
+plt.plot(lrelu, label='lrelu')
+plt.plot(elu, label='elu')
+plt.plot(selu, label='selu')
+
+plt.legend()
 plt.show()
