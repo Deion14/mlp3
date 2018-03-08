@@ -1,3 +1,4 @@
+
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
@@ -16,18 +17,7 @@ log = logging.getLogger(__name__)
 log.info('%s logger started.',__name__)
 
 
-def _sharpe(Returns, freq=252) :
-  """Given a set of returns, calculates naive (rfr=0) sharpe """
-  return (np.sqrt(freq) * np.mean(Returns))/np.std(Returns)
-
-def _prices2returns(prices):
-  px = pd.DataFrame(prices)
-  nl = px.shift().fillna(0)
-  R = ((px - nl)/nl).fillna(0).replace([np.inf, -np.inf], np.nan).dropna()
-  R = np.append( R[0].values, 0)
-  return R
-
-class QuandlEnvSrc(object):
+class QuandlEnvSrcTest(object):
   ''' 
   Quandl-based implementation of a TradingEnv's data source.
   
@@ -44,25 +34,16 @@ class QuandlEnvSrc(object):
     self.name = name
     self.auth = auth
     self.days = days+1
-    log.info('getting data for %s from quandl...',QuandlEnvSrc.Name)
-
-
+    log.info('getting data for %s from quandl...',QuandlEnvSrcTest.Name)
+   
     
-    Stocks=['GE', 'AMD', 'F', 'AAPL', 'TWTR', 'CHK', 'MU', 'MSFT', 'CSCO', 'T', 'SNAP', 'INTC', 'WFC', 'VALE', 'PFE', 'SWN', 'NVDA', 'WFT', 'CMCSA', 'FCX', 'SIRI', 'KMI', 'XOM', 'PBR', 'RAD', 'JPM', 'VZ', 'NOK', 'C', 'ABEV', 'RIG', 'NWL', 'ORCL', 'QCOM', 'VIPS', 'KO', 'AMAT', 'TEVA', 'AKS', 'ESV', 'FEYE', 'ABX', 'SLB', 'GM', 'CTL', 'SBUX', 'GRPN', 'CX', 'DAL', 'CBL', 'PG', 'RF', 'S', 'ATVI', 'MRK', 'JD', 'MGM', 'HAL', 'MRO', 'V', 'EXPE', 'HBI', 'FOXA', 'CVS', 'HPE', 'KEY', 'NBR', 'ECA', 'EBAY', 'FDC', 'MS', 'GG', 'AIG', 'JNJ', 'CZR', 'AUY', 'DDR', 'SAN', 'PYPL', 'CLF', 'WMT', 'ITUB', 'AMZN', 'MDLZ', 'GILD', 'NKE', 'BRX', 'PBR', 'A', 'KGC', 'HPQ', 'X', 'DWDP', 'ON', 'VER', 'RRC', 'CY', 'TSLA', 'SCHW', 'PTEN']
-    #if 10 stocks in stead of 100
     Stocks=['GE', 'AMD', 'F', 'AAPL', 'AIG', 'CHK', 'MU', 'MSFT', 'CSCO', 'T']
+    self.NumberOfStocks=len(Stocks)
     
-    #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2011-12-31', 'lte': '2016-12-31' }, paginate=True ) 
-    
-    
-
-    #PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
-
-    #GPU 
-    PATH_CSV=           "/Users/andrewplaate/mlp3/10StocksTest.csv"
+    #df = quandl.get_table('WIKI/PRICES', ticker=Stocks, qopts = { 'columns': ['ticker', 'volume','adj_close'] }, date = { 'gte': '2015-10-25', 'lte': '2017-12-29' }, paginate=False) 
+   
+    PATH_CSV=           "/Users/andrewplaate/mlp3/10Stocks.csv"
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
-    
-    
     self.NumberOfStocks=len(Stocks)
 
     
@@ -111,36 +92,32 @@ class QuandlEnvSrc(object):
     self.data = df
     self.step = 0
 
+
+
   def reset(self):
-    # we want contiguous data
+    # automatically starts at first since its test 
     
-    self.idx = np.random.randint( low = 252, high=len(self.data.index)-self.days )
+    self.idx = 252
     self.step = 0
 
-  def _step(self):
-    obs = np.empty([0])
-    for i in range(252):
-        obs_i = self.data.iloc[(self.idx-252+i):(self.idx+i)].as_matrix()
-        if i == 0:
-            obs = obs_i
-        else:
-            obs = np.dstack((obs, obs_i))
-    obs = np.moveaxis(obs, -1, 0)
+  def _step(self):    
+
+    obs = self.data.iloc[(self.idx-252):self.idx].as_matrix()
     self.idx += 1
     self.step += 1
     done = self.step >= self.days
-    
+    #pdb.set_trace()
+
     retAllStocks=list(np.arange(self.Dimension-1,self.Dimension*self.NumberOfStocks,self.Dimension ))
     returns=self.data.iloc[:self.idx,retAllStocks] #past returns of stocks
-
-
     return obs,done,returns
 
 
-
                     #############################                 #########################################
 
                     #############################                 #########################################
+
+
 
 
 
@@ -191,32 +168,61 @@ class TradingSim(object) :
     #bod_nav  = 1.0 if self.step == 0 else self.navs[self.step-1]
     #mkt_nav  = 1.0 if self.step == 0 else self.mkt_nav[self.step-1]
 
-    self.actions = action
+    
+    self.actions[self.step,:] = action
     #self.posns[self.step] = action - 1     
     #self.trades[self.step] = self.posns[self.step] - bod_posn
-    tradecosts = np.empty((10,1))
+    tradecosts = np.empty_like(action)
     tradecosts.fill(.0001)
 
 
-    costs = np.dot(action, tradecosts)
+    costs = np.dot(tradecosts,abs(action.reshape(-1,1)))
 
-    self.costs = costs
-    reward= np.sum((retrn*action-costs), axis=1)
 
+    trade_costs_pct = abs(self.trades[self.step]) * self.trading_cost_bps 
+    self.costs[self.step] = costs
+    #reward= np.dot(retrn, action.reshape(-1,1))-self.costs[self.step]
+    reward= np.dot(retrn, action.reshape(-1,1))-costs
+
+    nominal_reward = np.dot(retrn, action.reshape(-1,1)) - self.costs[self.step]
+    self.total_returns = self.total_returns + nominal_reward
+
+    oldsort = self.mkt_retrns[self.step-1,:]
     newsort = 0
     sortchange = 0
+    stdev_neg_returns = 0
     
-    self.stdev_neg_returns = np.std(reward[reward < 0])
-    if self.stdev_neg_returns == 0:
-        self.stdev_neg_returns = .001
+    if nominal_reward < 0:
+        self.negative_returns = np.append(self.negative_returns, nominal_reward)
+        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
+    else:
+        stdev_neg_returns = np.sqrt(np.std(self.negative_returns))
+    if stdev_neg_returns == 0:
+        newsort = self.total_returns / .1
+    else:
+        newsort = self.total_returns / stdev_neg_returns
+    
 
-    def get_sortchange(x): return float(x)/float(self.stdev_neg_returns)
-    f = np.vectorize(get_sortchange)
-    sortchange = f(reward)
-    newsort = sortchange.sum()
-    nominal_reward = reward.sum()
+    if oldsort == 0:
+        sortchange = newsort
+    else:
+        sortchange = (newsort - oldsort)/oldsort
+
+        
+    self.mkt_retrns[self.step,:] = newsort
+             
     
-    info = { 'reward': reward,  'costs':self.costs ,'nominal_reward':nominal_reward}
+    #reward = ( (bod_posn * retrn) - self.costs[self.step] )
+    #pdb.set_trace()
+   # self.strat_retrns[self.step] = sortchange
+
+    #if self.step != 0 :
+    #  self.navs[self.step] =  bod_nav * (1 + self.strat_retrns[self.step-1])
+    #  self.mkt_nav[self.step] =  mkt_nav * (1 + self.mkt_retrns[self.step-1])
+    
+    #info = { 'reward': reward, 'nav':self.navs[self.step], 'costs':self.costs[self.step] }
+    info = { 'reward': reward,  'costs':self.costs[self.step] ,'nominal_reward':nominal_reward}
+
 
     self.step += 1      
     return sortchange, newsort, info
@@ -251,37 +257,22 @@ class TradingSim(object) :
 
 
 
+
+                    #############################                 #########################################
+
+                    #############################                 #########################################
+
+
+
 class TestingEnv(gym.Env):
   """This gym implements a simple trading environment for reinforcement learning.
 
-  The gym provides daily observations based on real market data pulled
-  from Quandl on, by default, the SPY etf. An episode is defined as 252
-  contiguous days sampled from the overall dataset. Each day is one
-  'step' within the gym and for each step, the algo has a choice:
-
-  SHORT (0)
-  FLAT (1)
-  LONG (2)
-
-  If you trade, you will be charged, by default, 10 BPS of the size of
-  your trade. Thus, going from short to long costs twice as much as
-  going from short to/from flat. Not trading also has a default cost of
-  1 BPS per step. Nobody said it would be easy!
-
-  At the beginning of your episode, you are allocated 1 unit of
-  cash. This is your starting Net Asset Value (NAV). If your NAV drops
-  to 0, your episode is over and you lose. If your NAV hits 2.0, then
-  you win.
-
-  The trading env will track a buy-and-hold strategy which will act as
-  the benchmark for the game.
-
-  """
+   """
   metadata = {'render.modes': ['human']}
 
   def __init__(self):
     self.days = 252
-    self.src = QuandlEnvSrc(days=self.days)
+    self.src = QuandlEnvSrcTest(days=self.days)
     self.sim = TradingSim(steps=self.days, trading_cost_bps=1e-3,
                           time_cost_bps=1e-4,NumberOfStocks=self.src.NumberOfStocks)
 
@@ -302,8 +293,8 @@ class TestingEnv(gym.Env):
     #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
     observation, done, Returns = self.src._step()
     retAllStocks=list(np.arange(self.src.Dimension-1,self.src.Dimension*self.src.NumberOfStocks,self.src.Dimension ))
-    yret = observation[:,-1,retAllStocks]
-
+    yret = observation[-1,retAllStocks]
+    
     reward, sort, info = self.sim._step( action, yret )
 
     return observation, reward, done, sort, info, Returns
@@ -356,10 +347,3 @@ class TestingEnv(gym.Env):
           alldf = df if alldf is None else pd.concat([alldf,df], axis=0)
             
     return alldf
-
-
-
-                    #############################                 #########################################
-
-                    #############################                 #########################################
-
