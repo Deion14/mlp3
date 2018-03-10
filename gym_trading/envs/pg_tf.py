@@ -66,10 +66,10 @@ class PolicyModel:
       
     self.D = D
     self.A = A
-    self.T = 252    
+    self.T = 252
     
     # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_policy')
+    self.X = tf.placeholder(tf.float32, shape=(None, 63, self.D), name='X_for_policy')
     self.actions = tf.placeholder(tf.float32, shape=(None,self.A), name='actions')
     self.advantages = tf.placeholder(tf.float32, shape=(None,1), name='advantages')
     
@@ -156,7 +156,7 @@ class PolicyModel:
         h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
         
     
-    p_val = tf.reshape(h,[-1,self.num_hiddenRNN*self.T])
+    p_val = tf.reshape(h,[-1,self.num_hiddenRNN*63])
 
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     output=tf.contrib.layers.fully_connected(p_val,#tf.contrib.layers.flatten(h),
@@ -212,7 +212,7 @@ class PolicyModel:
 
   def partial_fit(self, X, actions, advantages):
     
-    X = np.reshape(X, (-1, self.T, self.D))
+    #X = np.reshape(X, (-1, self.T, self.D))
     
     actions = np.reshape(actions, (-1, self.A))
     advantages = np.reshape(advantages, (-1, 1))
@@ -231,7 +231,7 @@ class PolicyModel:
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
   def sample_action(self, X):
-    X = np.reshape(X, (-1, self.T, self.D))  
+    #X = np.reshape(X, (-1, self.T, self.D))
     p = self.predict(X)
     return p
 
@@ -259,7 +259,7 @@ class ValueModel:
     self.costs = []
 
 #    # inputs and targets
-    self.X = tf.placeholder(tf.float32, shape=(None, self.T, self.D), name='X_for_value')
+    self.X = tf.placeholder(tf.float32, shape=(None, 63, self.D), name='X_for_value')
     self.Y = tf.placeholder(tf.float32, shape=(None,1), name='Y')     
         
         
@@ -338,9 +338,9 @@ class ValueModel:
     with tf.variable_scope('critic', initializer=tf.contrib.layers.xavier_initializer()):
         h, _ =  tf.nn.dynamic_rnn(cell, self.X, dtype=tf.float32) 
                  
-        
-    v_val = tf.reshape(h,[-1,self.num_hiddenRNN*self.T])
-    
+    v_val = tf.reshape(h,[-1,self.num_hiddenRNN*63])
+
+
     init = tf.contrib.layers.xavier_initializer(uniform=False, dtype=tf.float32)
     Y_hat = tf.contrib.layers.fully_connected(v_val,#tf.contrib.layers.flatten(h),
                                          1,
@@ -381,7 +381,7 @@ class ValueModel:
 
   def partial_fit(self, X, Y):
 
-    X = np.reshape(X, (-1, self.T, self.D))
+    #X = np.reshape(X, (-1, self.T, self.D))
     Y = np.reshape(Y, (-1, 1))
     self.session.run(self.train_op, feed_dict={self.X: X, self.Y: Y})
     cost = self.session.run(self.cost, feed_dict={self.X: X, self.Y: Y})
@@ -389,7 +389,7 @@ class ValueModel:
 
   def predict(self, X):
 
-    X = np.reshape(X, (-1, self.T, self.D))
+    #X = np.reshape(X, (-1, self.T, self.D))
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
@@ -440,7 +440,7 @@ def training():
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
   num_hiddenRNN = 24
-  architecture = 'RNN'
+  architecture = 'LSTM'
   DropoutMemoryStates = False
   LR = 'Adam'
   learning_rate = 1e-4
@@ -511,8 +511,10 @@ def training():
         
         if n % 1 == 0:
             print("episode:", n, 
-                "total sort: %.4f" % sort, 
+                "total sort: %.4f" % sort,
+                "nominal rewards: %.4f" % nominal_reward,
                 "testing sort %.4f:" %t_sort,
+                "testing nominal rewards: %.4f" % t_nom,
                 "in time: %.3f" %(e_time-s_time))
         
       
@@ -550,138 +552,7 @@ def make_testing_predictions(env, pmodel):
     
   observation, reward, done, sort , info, _ = env.step(action)
   #print(action)
-  return sort, info['nominal_reward']     
-  
-    
+  return sort, info['nominal_reward']
 
-def testing():
-    
-  env_testing = gym.make('testing-v0')
-  env_testing = env_testing.unwrapped
-  
-  tf.reset_default_graph()
-  
-  actFuncs=["relu", "lrelu", "selu", "elu"]
-  name=["no2009_RNN_Adam_10e4_relu","no2009_RNN_Adam_10e4_lrelu","no2009_RNN_Adam_10e4_selu","no2009_RNN_Adam_10e4_elu"]
-  
-  NumOfHiddLayers = 1    
-  output_keep_prob = 0.8
-  state_keep_prob = 0.8
-  DropoutVariational_recurrent = False
-  Num_Of_variables = 3
-  num_hiddenRNN = 24
-  architecture = 'RNN'
-  DropoutMemoryStates = False
-  LR = 'Adam'
-  learning_rate = 1e-4
-  regulizer="l2"
-  regulizerScale=0.0001
-    
-  D,A = 30, 10  
-  
-  for i in range(len(actFuncs)):      
-      tf.reset_default_graph()
-      #D = ft.dimensions
- 
-      pmodel = PolicyModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
-                           Num_Of_variables=Num_Of_variables,
-                           LR=LR,
-                           architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
-                           regulizer =regulizer,
-                           regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
-                           DropoutMemoryStates= DropoutMemoryStates,
-                           DropoutVariational_recurrent=DropoutVariational_recurrent,
-                           output_keep_prob=output_keep_prob,
-                           state_keep_prob=state_keep_prob)
-      
-      vmodel = ValueModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
-                           Num_Of_variables=Num_Of_variables,
-                           LR=LR,
-                           architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
-                           regulizer =regulizer,
-                           regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
-                           DropoutMemoryStates= DropoutMemoryStates,
-                           DropoutVariational_recurrent=DropoutVariational_recurrent,
-                           output_keep_prob=output_keep_prob,
-                           state_keep_prob=state_keep_prob)
-      
-      saver = tf.train.Saver()
-      session = tf.InteractiveSession()
-      path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
-      saver.restore(session, path+"/saved_models/RNN_Adam_10e4_"+actFuncs[i]+"/model.ckpt")
-      
-      pmodel.set_session(session)
-      vmodel.set_session(session)
-      
-    
-      if 'monitor' in sys.argv:
-        filename = os.path.basename(__file__).split('.')[0]
-        monitor_dir = './' + filename + '_' + str(datetime.now())
-        env_testing = wrappers.Monitor(env_testing, monitor_dir)
-    
-      N = 5
-      sorts = np.empty(N)
-      nominal_rewards = np.empty(N)
-      
-      for n in range(N):
-        s_time = time.time()
-        sort, nominal_reward = make_testing_predictions(env_testing, pmodel)
-        e_time = time.time()
-        
-        sorts[n] = sort    
-        nominal_rewards[n] = nominal_reward
-        
-        if n % 1 == 0:
-            print("episode:", n, 
-                "total reward: %.4f" % sort, 
-                "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
-                "in time: %.3f" %(e_time-s_time))
-        
-      
-      filenameModel = path+"/saved_models/RNN_Adam_10e4_"+actFuncs[i]+"/model.ckpt"
-        
-      if not os.path.exists(filenameModel):
-          os.makedirs(filenameModel)   
-            
-      np.savetxt(filenameModel+"/sorts_test.txt", sorts)
-      np.savetxt(filenameModel+"/nominal_rewards_test.txt", nominal_rewards)
-      
-      saver = tf.train.Saver(save_relative_paths=True)
-      saver.save(session, filenameModel+"/model.ckpt")
-  
-  
-  
-  pmodel = PolicyModel(D, A)
-  vmodel = ValueModel(D, A)  
-  
-  saver = tf.train.Saver()
-  session = tf.InteractiveSession()
-  
-  saver.restore(session, "saved_models/model.ckpt")
-  
-  pmodel.set_session(session)
-  vmodel.set_session(session)
-  
-  totalrewards = []
-  for i in range(50):
-      totalreward = make_testing_predictions(env_testing, pmodel)
-      totalrewards.append(totalreward)
-  
-  print(totalrewards)    
-
-if __name__ == '__main__':
-  
-  s_time = time.time()
-  training()
-  e_time = time.time()
-  
-  print(e_time-s_time)
-  #main_testing()
+training()
+#main_testing()
