@@ -59,7 +59,7 @@ class QuandlEnvSrc(object):
     #PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
 
     #GPU 
-    PATH_CSV=           "/Users/colinsmith/mlp3/10Stocks.csv"
+    PATH_CSV=           "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
