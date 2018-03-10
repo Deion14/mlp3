@@ -393,15 +393,22 @@ class ValueModel:
     return self.session.run(self.predict_op, feed_dict={self.X: X})
 
 
-def play_one_td(env, pmodel, vmodel, gamma):
-
+def play_one_td(envs, pmodel, vmodel, gamma):
+  
+  env, testing_env = envs[0], envs[1]  
+    
   observation,_ = env.reset()
-  done = False
+  testing_obs,_ = testing_env.reset()
+  
   
   action = pmodel.sample_action(observation)
   prev_observation = observation
   observation, reward, done, sort , info, _ = env.step(action)
   reward = np.reshape(reward, (-1,1))
+  
+
+  test_action = pmodel.sample_action(testing_obs)
+  _, _, _, test_sort , test_info, _ = testing_env.step(test_action)
   
   # update the models
   V_next = vmodel.predict(observation)
@@ -412,18 +419,21 @@ def play_one_td(env, pmodel, vmodel, gamma):
   vmodel.partial_fit(prev_observation, G)
     
   #return np.array(total_rewards[-150:]).mean(), iters
-  return sort, info['nominal_reward']
+  return sort, info['nominal_reward'], test_sort, test_info['nominal_reward']
   
 
 def training():
     
-  env = gym.make('trading-v0')
-  env = env.unwrapped
+  env_trading = gym.make('trading-v0')
+  env_trading = env_trading.unwrapped
+  
+  env_testing = gym.make('testing-v0')
+  env_testing = env_testing.unwrapped
 
   
-  name=["RNN_GD_10e5_relu","RNN_GD_10e6_relu","RNN_Adam_10e5_relu","RNN_Adam_10e3_relu","RNN_Adam_10e2_relu"]
+  name=["RNN_Adam_10e4_relu2","RNN_Adam_10e4_relu3"]
+  actFuncs=["relu","relu"]
   
-  actFunc="relu"
   NumOfHiddLayers = 1    
   output_keep_prob = 0.8
   state_keep_prob = 0.8
@@ -432,8 +442,8 @@ def training():
   num_hiddenRNN = 24
   architecture = 'RNN'
   DropoutMemoryStates = False
-  LR = ['GD','GD','Adam','Adam','Adam']
-  learning_rate = [1e-5,1e-6,1e-5,1e-3,1e-2]
+  LR = 'Adam'
+  learning_rate = 1e-4
   regulizer="l2"
   regulizerScale=0.0001
     
@@ -446,10 +456,10 @@ def training():
       pmodel = PolicyModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR[i],
+                           LR=LR,
                            architecture=architecture,
-                           actFunc=actFunc,
-                           learning_rate=learning_rate[i],
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
@@ -461,10 +471,10 @@ def training():
       vmodel = ValueModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR[i],
+                           LR=LR,
                            architecture=architecture,
-                           actFunc=actFunc,
-                           learning_rate=learning_rate[i],
+                           actFunc=actFuncs[i],
+                           learning_rate=learning_rate,
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
@@ -481,26 +491,28 @@ def training():
       vmodel.set_session(session)
       gamma = 0.95
     
-      if 'monitor' in sys.argv:
-        filename = os.path.basename(__file__).split('.')[0]
-        monitor_dir = './' + filename + '_' + str(datetime.now())
-        env = wrappers.Monitor(env, monitor_dir)
-    
       N = 5000
       sorts = np.empty(N)
       nominal_rewards = np.empty(N)
+      
+      t_sorts = np.empty(N)
+      t_nominal_rewards = np.empty(N)
+      
       for n in range(N):
         s_time = time.time()
-        sort, nominal_reward = play_one_td(env, pmodel, vmodel, gamma)
+        sort, nominal_reward, t_sort, t_nom = play_one_td([env_trading, env_testing], pmodel, vmodel, gamma)
         e_time = time.time()
         
         sorts[n] = sort    
         nominal_rewards[n] = nominal_reward
         
+        t_sorts[n] = t_sort    
+        t_nominal_rewards[n] = t_nom
+        
         if n % 1 == 0:
             print("episode:", n, 
-                "total reward: %.4f" % sort, 
-                "avg reward (last 10): %.4f" % sorts[max(0, n-10):(n+1)].mean(),
+                "total sort: %.4f" % sort, 
+                "testing sort %.4f:" %t_sort,
                 "in time: %.3f" %(e_time-s_time))
         
       
@@ -511,6 +523,9 @@ def training():
             
       np.savetxt(filenameModel+"/sorts.txt", sorts)
       np.savetxt(filenameModel+"/nominal_rewards.txt", nominal_rewards)
+      
+      np.savetxt(filenameModel+"/test_sorts.txt", t_sorts)
+      np.savetxt(filenameModel+"/test_nominal_rewards.txt", t_nominal_rewards)
       
       saver = tf.train.Saver(save_relative_paths=True)
       saver.save(session, filenameModel+"/model.ckpt")
@@ -547,7 +562,7 @@ def testing():
   tf.reset_default_graph()
   
   actFuncs=["relu", "lrelu", "selu", "elu"]
-  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_selu","RNN_Adam_10e4_elu"]
+  name=["no2009_RNN_Adam_10e4_relu","no2009_RNN_Adam_10e4_lrelu","no2009_RNN_Adam_10e4_selu","no2009_RNN_Adam_10e4_elu"]
   
   NumOfHiddLayers = 1    
   output_keep_prob = 0.8
@@ -612,7 +627,7 @@ def testing():
         monitor_dir = './' + filename + '_' + str(datetime.now())
         env_testing = wrappers.Monitor(env_testing, monitor_dir)
     
-      N = 1
+      N = 5
       sorts = np.empty(N)
       nominal_rewards = np.empty(N)
       

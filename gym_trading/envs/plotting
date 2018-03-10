@@ -33,3 +33,15 @@ plt.plot(selu, label='selu')
 
 plt.legend()
 plt.show()
+
+training = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
+testing = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/test_sorts.txt")
+
+training = moving_average(training, n=100)
+testing = moving_average(testing, n=100)
+
+plt.plot(training, label='training')
+plt.plot(testing, label='testing')
+
+plt.legend()
+plt.show()

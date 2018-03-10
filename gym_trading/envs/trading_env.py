@@ -114,7 +114,7 @@ class QuandlEnvSrc(object):
   def reset(self):
     # we want contiguous data
     
-    self.idx = np.random.randint( low = 252, high=len(self.data.index)-self.days )
+    self.idx = np.random.randint( low = 600, high=len(self.data.index)-self.days )
     self.step = 0
 
   def _step(self):
