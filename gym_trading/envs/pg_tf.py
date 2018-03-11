@@ -66,7 +66,7 @@ class PolicyModel:
       
     self.D = D
     self.A = A
-    self.T = 252
+    self.T = 63
     
     # inputs and targets
     self.X = tf.placeholder(tf.float32, shape=(None, 63, self.D), name='X_for_policy')
@@ -255,7 +255,8 @@ class ValueModel:
     
     self.D = D
     self.A = A
-    self.T = 252
+    self.T = 63
+    self.T = 63
     self.costs = []
 
 #    # inputs and targets
@@ -431,8 +432,8 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["RNN_Adam_10e4_relu2","RNN_Adam_10e4_relu3"]
-  actFuncs=["relu","relu"]
+  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_elu","RNN_Adam_10e4_selu"]
+  actFuncs=["relu","lrelu","elu","selu"]
   
   NumOfHiddLayers = 1    
   output_keep_prob = 0.8
@@ -440,7 +441,7 @@ def training():
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
   num_hiddenRNN = 24
-  architecture = 'LSTM'
+  architecture = 'RNN'
   DropoutMemoryStates = False
   LR = 'Adam'
   learning_rate = 1e-4
@@ -491,7 +492,7 @@ def training():
       vmodel.set_session(session)
       gamma = 0.95
     
-      N = 5000
+      N = 10000
       sorts = np.empty(N)
       nominal_rewards = np.empty(N)
       

@@ -59,7 +59,8 @@ class QuandlEnvSrc(object):
     #PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10Stocks.csv"
 
     #GPU 
-    PATH_CSV="/Users/colinsmith/mlp3/10Stocks.csv"
+
+    PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10StocksNew.csv"
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
@@ -113,8 +114,8 @@ class QuandlEnvSrc(object):
 
   def reset(self):
     # we want contiguous data
-    
-    self.idx = np.random.randint( low = 252, high=len(self.data.index)-self.days )
+    print(len(self.data.index))
+    self.idx = np.random.randint( low = 1, high=len(self.data.index)-self.days )
     self.step = 0
 
   def _step(self):
@@ -206,7 +207,7 @@ class TradingSim(object) :
     newsort = 0
     sortchange = 0
     
-    self.stdev_neg_returns = np.std(reward[reward < 0])
+    self.stdev_neg_returns = np.sqrt(np.std(reward[reward < 0]))
     if self.stdev_neg_returns == 0:
         self.stdev_neg_returns = .001
 
