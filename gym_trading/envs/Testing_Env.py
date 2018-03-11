@@ -60,7 +60,7 @@ class QuandlEnvSrc(object):
 
     #GPU 
 
-    PATH_CSV="/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/10StocksNew.csv"
+    PATH_CSV="/Users/colinsmith/mlp3/10StocksNew.csv"
     df=pd.read_csv(PATH_CSV, header=0, sep=',')
     
     
@@ -114,14 +114,13 @@ class QuandlEnvSrc(object):
 
   def reset(self):
     # we want contiguous data
-    print(len(self.data.index))
-    self.idx = np.random.randint( low = 1, high=len(self.data.index)-self.days )
+    self.idx = np.random.randint( low = 70, high=len(self.data.index)-self.days )
     self.step = 0
 
   def _step(self):
     obs = np.empty([0])
     for i in range(252):
-        obs_i = self.data.iloc[(self.idx-252+i):(self.idx+i)].as_matrix()
+        obs_i = self.data.iloc[(self.idx-63+i):(self.idx+i)].as_matrix()
         if i == 0:
             obs = obs_i
         else:
