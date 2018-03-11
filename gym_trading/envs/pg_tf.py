@@ -519,7 +519,7 @@ def training():
                 "in time: %.3f" %(e_time-s_time))
         
       
-      filenameModel = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/saved_models/" + name[i]
+      filenameModel = "/Users/colinsmith/mlp3/gym_trading/envs/saved_models/" + name[i]
         
       if not os.path.exists(filenameModel):
           os.makedirs(filenameModel)   
