@@ -436,12 +436,12 @@ def training():
   actFuncs=["lrelu","lrelu","elu","selu"]
   
   NumOfHiddLayers = 1    
-  output_keep_prob = 0.8
-  state_keep_prob = 0.8
+  output_keep_prob = .8
+  state_keep_prob = .8
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
   num_hiddenRNN = 24
-  architecture = 'RNN'
+  architecture = 'LSTM'
   DropoutMemoryStates = False
   LR = 'Adam'
   learning_rate = 1e-4
