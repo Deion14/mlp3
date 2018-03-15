@@ -104,7 +104,7 @@ class QuandlEnvSrc(object):
     
     colNames = [i for j, i in enumerate(colNames) if j not in range(self.Dimension-1,self.NumberOfStocks*self.Dimension,self.Dimension)]
     
-    DF[colNames] = DF[colNames].apply(lambda x: (x - x.mean()) / (x.var()))
+    DF[colNames] = DF[colNames].apply(lambda x: (x - x.mean()) / (x.std()))
     
     df=DF
     self.min_values = df.min(axis=0)

@@ -432,8 +432,8 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["RNN_Adam_10e4_relu","RNN_Adam_10e4_lrelu","RNN_Adam_10e4_elu","RNN_Adam_10e4_selu"]
-  actFuncs=["relu","lrelu","elu","selu"]
+  name=["RNN_Adam_10e4_relu"]
+  actFuncs=["lrelu","lrelu","elu","selu"]
   
   NumOfHiddLayers = 1    
   output_keep_prob = 0.8
