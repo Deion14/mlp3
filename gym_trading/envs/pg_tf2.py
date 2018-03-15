@@ -432,8 +432,8 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["LSTM_Adam_10e4_relu"]
-  actFuncs="lrelu"
+  name=["GRU_Adam_10e4_lrelu_1_24","GRU_GD_10e4_lrelu_1_24"]
+  actFuncs=["lrelu","lrelu"]
   
   NumOfHiddLayers = 1    
   output_keep_prob = .8
@@ -441,7 +441,7 @@ def training():
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
   num_hiddenRNN = 24
-  architecture = 'LSTM'
+  architecture = 'GRU'
   DropoutMemoryStates = False
   LR = ['Adam','GD']
   learning_rate = 1e-4
@@ -457,7 +457,7 @@ def training():
       pmodel = PolicyModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR,
+                           LR=LR[i],
                            architecture=architecture,
                            actFunc=actFuncs[i],
                            learning_rate=learning_rate,
@@ -472,7 +472,7 @@ def training():
       vmodel = ValueModel(D, A, 
                            NumOfLayers=NumOfHiddLayers,
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR,
+                           LR=LR[i],
                            architecture=architecture,
                            actFunc=actFuncs[i],
                            learning_rate=learning_rate,
@@ -510,7 +510,7 @@ def training():
         t_sorts[n] = t_sort    
         t_nominal_rewards[n] = t_nom
         
-        if n % 1 == 0:
+        if n % 10 == 0:
             print("episode:", n, 
                 "total sort: %.4f" % sort,
                 "nominal rewards: %.4f" % nominal_reward,
@@ -519,7 +519,7 @@ def training():
                 "in time: %.3f" %(e_time-s_time))
         
       
-      filenameModel = "/Users/colinsmith/mlp3/gym_trading/envs/saved_models/" + name[i]
+      filenameModel = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/saved_models/" + name[i]
         
       if not os.path.exists(filenameModel):
           os.makedirs(filenameModel)   
