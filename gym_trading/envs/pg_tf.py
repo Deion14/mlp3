@@ -432,53 +432,67 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["RNN_Adam_10e4_relu"]
-  actFuncs=["lrelu","lrelu","elu","selu"]
+  name=["RNN_Adam_10e4_lrelu_2_24",
+        "RNN_Adam_10e4_lrelu_2_100",
+        "RNN_Adam_10e4_lrelu_3_24",
+        "RNN_Adam_10e4_lrelu_3_100"]
   
-  NumOfHiddLayers = 1    
-  output_keep_prob = 0.8
-  state_keep_prob = 0.8
+  name=["RNN_Adam_10e4_lrelu_1_100_reg",
+        "RNN_Adam_10e4_lrelu_2_100_reg"]
+  
+  
+  actFuncs="lrelu"
+  
+  output_keep_prob = 0.6
+  state_keep_prob = 0.6
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
-  num_hiddenRNN = 24
   architecture = 'RNN'
   DropoutMemoryStates = False
   LR = 'Adam'
   learning_rate = 1e-4
   regulizer="l2"
   regulizerScale=0.0001
-    
+  
+  
+  
+  
+  NumOfHiddLayers = [1,2]      
+  num_hiddenRNN = [100,100,24,100]
+  
+
+  
   D,A = 30, 10
   
   for i in range(len(name)):      
       tf.reset_default_graph()
       #D = ft.dimensions
- 
+      print(name[i])
       pmodel = PolicyModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
                            LR=LR,
                            architecture=architecture,
-                           actFunc=actFuncs[i],
+                           actFunc=actFuncs,
                            learning_rate=learning_rate,
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
+                           num_hiddenRNN=num_hiddenRNN[i],
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
                            output_keep_prob=output_keep_prob,
                            state_keep_prob=state_keep_prob)
       
       vmodel = ValueModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
                            LR=LR,
                            architecture=architecture,
-                           actFunc=actFuncs[i],
+                           actFunc=actFuncs,
                            learning_rate=learning_rate,
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
+                           num_hiddenRNN=num_hiddenRNN[i],
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
                            output_keep_prob=output_keep_prob,
@@ -519,7 +533,7 @@ def training():
                 "in time: %.3f" %(e_time-s_time))
         
       
-      filenameModel = "/Users/colinsmith/mlp3/gym_trading/envs/saved_models/" + name[i]
+      filenameModel = "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/gym_trading/envs/saved_models/" + name[i]
         
       if not os.path.exists(filenameModel):
           os.makedirs(filenameModel)   

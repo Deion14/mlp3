@@ -9,39 +9,46 @@ Created on Thu Mar  8 13:02:15 2018
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
+path = "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/gym_trading/envs"
 
-relu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_relu/sorts.txt")
-lrelu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_lrelu/sorts.txt")
-elu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
-selu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_selu/sorts.txt")
 
 def moving_average(a, n=3) :
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
-relu = moving_average(relu, n=100)
-lrelu = moving_average(lrelu, n=100)
-elu = moving_average(elu, n=100)
-selu = moving_average(selu, n=100)
 
-plt.plot(relu, label='relu')
-plt.plot(lrelu, label='lrelu')
-plt.plot(elu, label='elu')
-plt.plot(selu, label='selu')
 
+
+
+name=["RNN_Adam_10e4_lrelu",
+      "RNN_Adam_10e4_lrelu_100",
+      "RNN_Adam_10e4_lrelu_2_24",
+        "RNN_Adam_10e4_lrelu_2_100",
+        "RNN_Adam_10e4_lrelu_3_24",
+        "RNN_Adam_10e4_lrelu_3_100",
+        "RNN_Adam_10e4_lrelu_1_100_reg",
+        "RNN_Adam_10e4_lrelu_2_100_reg"]
+  
+
+plt.figure()
+
+for i in range(len(name)):
+    
+   Train = np.loadtxt(path + "/saved_models/"+name[i] +"/sorts.txt")
+   Train  = moving_average(Train, n=500)
+   plt.plot(Train, label=name[i])
 plt.legend()
 plt.show()
 
-training = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
-testing = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/test_sorts.txt")
 
-training = moving_average(training, n=100)
-testing = moving_average(testing, n=100)
+plt.figure()
 
-plt.plot(training, label='training')
-plt.plot(testing, label='testing')
-
+for i in range(len(name)):
+    
+   Test = np.loadtxt(path + "/saved_models/"+name[i] +"/test_sorts.txt")
+   Test  = moving_average(Test, n=500)
+   plt.plot(Test, label=name[i])
 plt.legend()
 plt.show()
+
