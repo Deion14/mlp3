@@ -8,8 +8,13 @@ Created on Thu Mar  8 13:02:15 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os 
 
-path = "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/gym_trading/envs"
+
+path = "/Users/deionvanrooijen/mlp3/gym_trading/envs/saved_models/""
+
+path="/Users/deionvanrooijen/mlp3/gym_trading/envs/saved_models/Final Results/RNN_act_Results/"
+names=os.listdir(path)
 
 
 def moving_average(a, n=3) :
@@ -30,26 +35,51 @@ name=["RNN_Adam_10e4_tanh",
         "RNN_Adam_10e4_lrelu_3_100",
         "RNN_Adam_10e4_lrelu_1_100_reg",
         "RNN_Adam_10e4_lrelu_2_100_reg"]
-  
 
-plt.figure()
+name=names  
+PlotNames=['RNN(lrelu)','RNN(relu)','RNN(selu)','RNN(elu)']
+#PlotNames=['RNN(Adam1e-6)','RNN(Adam1e-4)','RNN(Adam1e-5)','RNN(Adam1e-5)','RNN(Adam1e-3)']
 
+#name=['RNN_Adam_10e6_lrelu',
+#       'RNN_Adam_10e4_lrelu',
+#       'RNN_Adam_10e5_lrelu']
+
+plt.figure(figsize=(24,10))
+fig = plt.gcf()
+
+LabelSize=24
+TickSize=22
+fontsize=24
+
+NameSaveTrain="RNN_LR_Train"
 for i in range(len(name)):
     
-   Train = np.loadtxt(path + "/saved_models/"+name[i] +"/sorts.txt")
-   Train  = moving_average(Train, n=500)
-   plt.plot(Train, label=name[i])
-plt.legend()
+   Train = np.loadtxt(path +name[i] +"/sorts.txt")
+   Train  = moving_average(Train, n=250)
+   plt.plot(Train, label=PlotNames[i])
+plt.xlabel("Number of epochs", size=LabelSize)   
+plt.xticks(size=LabelSize)
+plt.yticks(size=TickSize)
+plt.ylabel("Sortino Ratio", size=LabelSize)      
+plt.legend(fontsize=fontsize)
+plt.savefig("/Users/deionvanrooijen/mlp3/images/"+NameSaveTrain+".eps",bbox_inches='tight')
 plt.show()
 
 
-plt.figure()
-
+plt.figure(figsize=(24,20))
+fig = plt.gcf()
+NameSaveTest="RNN_LR_Test"
 for i in range(len(name)):
     
-   Test = np.loadtxt(path + "/saved_models/"+name[i] +"/test_sorts.txt")
+   Test = np.loadtxt(path + name[i] +"/test_sorts.txt")
    Test  = moving_average(Test, n=500)
-   plt.plot(Test, label=name[i])
-plt.legend()
+   plt.plot(Test, label=PlotNames[i])
+plt.xlabel("Number of epochs", size=LabelSize)  
+plt.ylabel("Sortino Ratio", size=LabelSize)    
+plt.xticks(size=LabelSize)
+plt.yticks(size=TickSize)  
+plt.legend(fontsize=fontsize)
+plt.savefig("/Users/deionvanrooijen/mlp3/images/"+NameSaveTest+".eps",bbox_inches='tight')
+
 plt.show()
 
