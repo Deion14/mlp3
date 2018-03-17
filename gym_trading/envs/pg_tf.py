@@ -97,7 +97,9 @@ class PolicyModel:
     elif actFunc=="elu":
             self.actFunc= tf.nn.elu   
     elif actFunc=="selu":
-            self.actFunc= tf.nn.selu                   
+            self.actFunc= tf.nn.selu    
+    elif actFunc=="tanh":
+            self.actFunc= tf.nn.tanh                  
     else:
         assert("wrong acttivation function")
 
@@ -282,6 +284,8 @@ class ValueModel:
             self.actFunc= tf.nn.elu   
     elif actFunc=="selu":
             self.actFunc= tf.nn.selu                   
+    elif actFunc=="tanh":
+            self.actFunc= tf.nn.tanh     
     else:
         assert("wrong acttivation function")
 
@@ -437,14 +441,14 @@ def training():
         "RNN_Adam_10e4_lrelu_3_24",
         "RNN_Adam_10e4_lrelu_3_100"]
   
-  name=["RNN_Adam_10e4_lrelu_1_100_reg",
-        "RNN_Adam_10e4_lrelu_2_100_reg"]
+  name=["RNN_Adam_10e4_tanh",
+        "RNN_Adam_10e4_lrelu_"]
   
   
-  actFuncs="lrelu"
+  actFuncs="tanh"
   
-  output_keep_prob = 0.6
-  state_keep_prob = 0.6
+  output_keep_prob = 0.8
+  state_keep_prob = 0.8
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
   architecture = 'RNN'
@@ -458,13 +462,13 @@ def training():
   
   
   NumOfHiddLayers = [1,2]      
-  num_hiddenRNN = [100,100,24,100]
+  num_hiddenRNN = [24,100,24,100]
   
 
   
   D,A = 30, 10
   
-  for i in range(len(name)):      
+  for i in range(1):      #range(len(name)):      
       tf.reset_default_graph()
       #D = ft.dimensions
       print(name[i])

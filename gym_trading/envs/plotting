@@ -21,7 +21,8 @@ def moving_average(a, n=3) :
 
 
 
-name=["RNN_Adam_10e4_lrelu",
+name=["RNN_Adam_10e4_tanh",
+      "RNN_Adam_10e4_lrelu",
       "RNN_Adam_10e4_lrelu_100",
       "RNN_Adam_10e4_lrelu_2_24",
         "RNN_Adam_10e4_lrelu_2_100",
