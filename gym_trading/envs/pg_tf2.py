@@ -432,19 +432,19 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["GRU_Adam_10e4_lrelu_1_24","GRU_GD_10e4_lrelu_1_24"]
-  actFuncs=["lrelu","lrelu"]
+  name=["GRU_Adam_10e3_lrelu_2_100","GRU_Adam_10e3_lrelu_1_100","GRU_Adam_10e4_lrelu_3_100",'GRU_Adam_10e4_lrelu_4_100']
+  actFuncs=["lrelu","lrelu","lrelu","lrelu","lrelu"]
   
-  NumOfHiddLayers = 1    
-  output_keep_prob = .8
-  state_keep_prob = .8
+  NumOfHiddLayers = [2,1,3,4]    
+  output_keep_prob = [.8,.8,.8,.8]
+  state_keep_prob = [.8,.8,.8,.8]
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
-  num_hiddenRNN = 24
+  num_hiddenRNN = 100
   architecture = 'GRU'
   DropoutMemoryStates = False
-  LR = ['Adam','GD']
-  learning_rate = 1e-4
+  LR = 'Adam'
+  learning_rate = [1e-3,1e-3,1e-4,1e-4,1e-4,1e-4]
   regulizer="l2"
   regulizerScale=0.0001
     
@@ -455,34 +455,34 @@ def training():
       #D = ft.dimensions
  
       pmodel = PolicyModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR[i],
+                           LR=LR,
                            architecture=architecture,
                            actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
-                           output_keep_prob=output_keep_prob,
-                           state_keep_prob=state_keep_prob)
+                           output_keep_prob=output_keep_prob[i],
+                           state_keep_prob=state_keep_prob[i])
       
       vmodel = ValueModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
-                           LR=LR[i],
+                           LR=LR,
                            architecture=architecture,
                            actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
                            num_hiddenRNN=num_hiddenRNN,
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
-                           output_keep_prob=output_keep_prob,
-                           state_keep_prob=state_keep_prob)
+                           output_keep_prob=output_keep_prob[i],
+                           state_keep_prob=state_keep_prob[i])
       
       init = tf.global_variables_initializer()
       session = tf.InteractiveSession()
