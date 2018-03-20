@@ -9,7 +9,7 @@ Created on Thu Mar  8 13:02:15 2018
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
+path =  "/Users/deionvanrooijen/mlp3/gym_trading/envs"# "/afs/inf.ed.ac.uk/user/s17/s1793158/mlp3/gym_trading/envs"
 
 relu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_relu/sorts.txt")
 lrelu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_lrelu/sorts.txt")
