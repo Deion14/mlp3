@@ -8,40 +8,72 @@ Created on Thu Mar  8 13:02:15 2018
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os 
 
-path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs"
 
-relu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_relu/sorts.txt")
-lrelu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_lrelu/sorts.txt")
-elu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
-selu = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_selu/sorts.txt")
+path = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/saved_models/"
+
+name=os.listdir(path)
+
+name = [name for name in name if '2nd' in name]
+name.append('LSTM_Adam_10e4_lrelu')
+name.append('LSTM_Adam_10e5_lrelu')
+name.remove('2nd_LSTM_Adam_10e4_1stack_100')
+
+name = ['GRU_Adam_10e4_lrelu_1_24','GRU_Adam_10e5_lrelu_1_24','GRU_Adam_10e4_lrelu_1_100','GRU_Adam_10e4_lrelu_2_100','GRU_Adam_10e4_lrelu_3_100','GRU_Adam_10e4_lrelu_4_100']
+name = ['3rd_LSTM_Adam_10e4_2stack_100_drop', '2nd_LSTM_Adam_10e4_2stack_100','LSTM_Adam_10e5_lrelu']
+name = ['LSTM_Adam_10e4_lrelu','LSTM_Adam_10e5_lrelu','2nd_LSTM_Adam_10e5_1stack_100',
+        '2nd_LSTM_Adam_10e4_2stack_24','2nd_LSTM_Adam_10e5_2stack_24',
+        '2nd_LSTM_Adam_10e4_2stack_100','2nd_LSTM_Adam_10e5_2stack_100']
 
 def moving_average(a, n=3) :
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
-relu = moving_average(relu, n=100)
-lrelu = moving_average(lrelu, n=100)
-elu = moving_average(elu, n=100)
-selu = moving_average(selu, n=100)
+PlotNames=['(1,24,-4)','(1,24,-5)','(1,100,-5)',
+           '(2,24,-4)','(2,24,-5)','(2,100,-4)','(2,100,-5)']
 
-plt.plot(relu, label='relu')
-plt.plot(lrelu, label='lrelu')
-plt.plot(elu, label='elu')
-plt.plot(selu, label='selu')
 
-plt.legend()
+plt.figure(figsize=(24,10))
+fig = plt.gcf()
+
+LabelSize=24
+TickSize=22
+fontsize=24
+
+NameSaveTrain="LSTM_train"
+for i in range(len(name)):
+    
+   Train = np.loadtxt(path +name[i] +"/sorts.txt")
+   Train  = moving_average(Train, n=250)
+   plt.plot(Train, label=PlotNames[i])
+   
+plt.title("LSTM on training set", size=fontsize+2)
+plt.xlabel("Number of epochs", size=LabelSize)   
+plt.xticks(size=LabelSize)
+plt.yticks(size=TickSize)
+plt.ylabel("Sortino Ratio", size=LabelSize)      
+plt.legend(fontsize=fontsize)
+plt.savefig("/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/"+NameSaveTrain+".png",bbox_inches='tight')
 plt.show()
 
-training = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/sorts.txt")
-testing = np.loadtxt(path + "/saved_models/RNN_Adam_10e4_elu/test_sorts.txt")
 
-training = moving_average(training, n=100)
-testing = moving_average(testing, n=100)
+plt.figure(figsize=(24,20))
+fig = plt.gcf()
 
-plt.plot(training, label='training')
-plt.plot(testing, label='testing')
-
-plt.legend()
+NameSaveTest="LSTM_test"
+for i in range(len(name)):
+    
+   Test = np.loadtxt(path + name[i] +"/test_sorts.txt")
+   Test  = moving_average(Test, n=500)
+   plt.plot(Test, label=PlotNames[i])
+   
+plt.title("LSTM on testing set", size=fontsize+2)
+plt.xlabel("Number of epochs", size=LabelSize)  
+plt.ylabel("Sortino Ratio", size=LabelSize)    
+plt.xticks(size=LabelSize)
+plt.yticks(size=TickSize)  
+plt.legend(fontsize=fontsize)
+plt.savefig("/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/"+NameSaveTest+".png",bbox_inches='tight')
 plt.show()

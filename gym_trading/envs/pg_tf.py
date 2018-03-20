@@ -14,7 +14,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from gym import wrappers
 from datetime import datetime
-
+from math import isnan
 import matplotlib as mpl
 from matplotlib import interactive
 interactive(True)
@@ -432,19 +432,26 @@ def training():
   env_testing = env_testing.unwrapped
 
   
-  name=["LSTM_Adam_10e4_relu"]
-  actFuncs="lrelu"
+  name=["2nd_LSTM_Adam_10e4_1stack_100",
+        "2nd_LSTM_Adam_10e4_2stack_24",
+        "2nd_LSTM_Adam_10e4_2stack_100",
+        "2nd_LSTM_Adam_10e5_1stack_100",
+        "2nd_LSTM_Adam_10e5_2stack_24",
+        "2nd_LSTM_Adam_10e5_2stack_100"]
+
+  name = ["3rd_LSTM_Adam_10e4_2stack_100_drop"]
   
-  NumOfHiddLayers = 1    
-  output_keep_prob = .8
-  state_keep_prob = .8
+  actFuncs="lrelu"
+  NumOfHiddLayers = [2]    
+  output_keep_prob = .6
+  state_keep_prob = .6
   DropoutVariational_recurrent = False
   Num_Of_variables = 3
-  num_hiddenRNN = 24
+  num_hiddenRNN = [100]
   architecture = 'LSTM'
   DropoutMemoryStates = False
-  LR = ['Adam','GD']
-  learning_rate = 1e-4
+  LR = 'Adam'
+  learning_rate = [1e-4]
   regulizer="l2"
   regulizerScale=0.0001
     
@@ -455,30 +462,30 @@ def training():
       #D = ft.dimensions
  
       pmodel = PolicyModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
                            LR=LR,
                            architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           actFunc=actFuncs,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
+                           num_hiddenRNN=num_hiddenRNN[i],
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
                            output_keep_prob=output_keep_prob,
                            state_keep_prob=state_keep_prob)
       
       vmodel = ValueModel(D, A, 
-                           NumOfLayers=NumOfHiddLayers,
+                           NumOfLayers=NumOfHiddLayers[i],
                            Num_Of_variables=Num_Of_variables,
                            LR=LR,
                            architecture=architecture,
-                           actFunc=actFuncs[i],
-                           learning_rate=learning_rate,
+                           actFunc=actFuncs,
+                           learning_rate=learning_rate[i],
                            regulizer =regulizer,
                            regulizerScale=regulizerScale,
-                           num_hiddenRNN=num_hiddenRNN,
+                           num_hiddenRNN=num_hiddenRNN[i],
                            DropoutMemoryStates= DropoutMemoryStates,
                            DropoutVariational_recurrent=DropoutVariational_recurrent,
                            output_keep_prob=output_keep_prob,
@@ -504,6 +511,9 @@ def training():
         sort, nominal_reward, t_sort, t_nom = play_one_td([env_trading, env_testing], pmodel, vmodel, gamma)
         e_time = time.time()
         
+        if isnan(sort):
+            break
+        
         sorts[n] = sort    
         nominal_rewards[n] = nominal_reward
         
@@ -519,7 +529,7 @@ def training():
                 "in time: %.3f" %(e_time-s_time))
         
       
-      filenameModel = "/Users/colinsmith/mlp3/gym_trading/envs/saved_models/" + name[i]
+      filenameModel = "/afs/inf.ed.ac.uk/user/s17/s1749290/mlp3/gym_trading/envs/saved_models/" + name[i]
         
       if not os.path.exists(filenameModel):
           os.makedirs(filenameModel)   
